@@ -1,0 +1,3 @@
+model,model_type,co-bps,vel R2,psth R2,params
+baseline,pca_latent_regression,0.0038680972481445605,0.07552087936814766,-24.147989507996353,"{""n_components"": 10, ""ridge_alpha"": 0.1}"
+improved,pca_latent_regression,0.0038680972481445605,0.07552087936814766,-24.147989507996353,"{""n_components"": 10, ""ridge_alpha"": 0.1}"

@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+.venv/
+
+# Data and generated outputs
+data/raw/
+results/mc_maze/predictions/*.h5
+results/mc_maze/run_metadata.json
+requirements/requirements.lock

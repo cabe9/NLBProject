@@ -1,0 +1,27 @@
+model_type: pca_latent_regression
+dataset_name: mc_maze
+data_path: null
+data_prefix: "*full"
+bin_size_ms: 5
+train_split: train
+eval_split: val
+include_psth: true
+log_offset: 0.0001
+seed: 0
+skip_fields:
+  - hand_pos
+  - cursor_pos
+  - eye_pos
+  - muscle_vel
+  - muscle_len
+  - joint_vel
+  - joint_ang
+  - force
+baseline:
+  kern_sd_ms: 50
+  alpha: 0.01
+improvement:
+  cv_folds: 3
+  kern_sd_grid: [30, 50, 70]
+  alpha_grid: [0.001, 0.01, 0.1]
+output_dir: results/mc_maze

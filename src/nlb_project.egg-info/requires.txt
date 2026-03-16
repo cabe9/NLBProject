@@ -1,0 +1,11 @@
+numpy>=1.24
+pandas==1.3.4
+scipy>=1.10
+scikit-learn>=1.3
+h5py>=3.9
+PyYAML>=6.0
+nlb-tools==0.0.4
+
+[dev]
+pytest>=8.0
+pip-tools>=7.0
