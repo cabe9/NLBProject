@@ -18,10 +18,10 @@ skip_fields:
   - joint_ang
   - force
 baseline:
-  kern_sd_ms: 50
-  alpha: 0.01
+  n_components: 10
+  ridge_alpha: 0.1
 improvement:
   cv_folds: 3
-  kern_sd_grid: [30, 50, 70]
-  alpha_grid: [0.001, 0.01, 0.1]
+  n_components_grid: [5, 10, 20, 30]
+  ridge_alpha_grid: [0.001, 0.01, 0.1, 1.0]
 output_dir: results/mc_maze

@@ -1,21 +1,44 @@
 # Neural Latents Benchmark (NLB'21) Project
 
-This repo is a reproducible NLB'21 project focused on `mc_maze`.
+This repository is a small, reproducible NLB'21 project focused on `mc_maze`.
 
-It currently supports three model families:
-1. `smoothing`: Gaussian smoothing of held-in spikes plus Poisson readout for held-out neurons.
-2. `pca_latent_regression`: PCA on held-in activity, then Ridge regression from latent state to held-out rates.
-3. `ridge_direct`: direct multi-target Ridge regression from held-in rates to held-out rates.
+It includes:
+1. an end-to-end local evaluation pipeline built on official `nlb_tools`
+2. multiple lightweight model options that can run on a laptop
+3. reproducible configs, saved result tables, and local tests
+
+Currently implemented model families:
+- `smoothing`
+- `pca_latent_regression`
+- `ridge_direct`
 
 Primary metric: `co-bps`. Secondary metrics: `vel R2` and `psth R2` when available.
 
-## Project structure
+## What the code does
 
-- `src/nlb_project/`: config loading, data path validation, models, and pipeline code
-- `scripts/run_experiment.py`: main experiment entrypoint
-- `scripts/get_data.py`: dataset download helper
+The pipeline:
+1. loads NWB data with `nlb_tools.nwb_interface.NWBDataset`
+2. builds train/eval/target tensors with official `nlb_tools.make_tensors`
+3. runs a reference parameter set
+4. runs cross-validation to choose a selected parameter set for the active model family
+5. writes prediction `.h5` artifacts and local evaluation metrics
+
+The checked-in config currently targets:
+
+```yaml
+model_type: pca_latent_regression
+dataset_name: mc_maze
+```
+
+## Repository layout
+
+- `src/nlb_project/`: package code
+- `src/nlb_project/pipeline.py`: experiment orchestration
+- `src/nlb_project/models/`: model implementations
+- `scripts/run_experiment.py`: CLI entrypoint
+- `scripts/get_data.py`: DANDI download helper
 - `configs/mc_maze_smoothing.yaml`: current experiment config
-- `results/`: saved metrics, summaries, metadata, and prediction artifacts
+- `results/mc_maze/`: saved metrics and summary tables
 - `tests/`: unit and smoke tests
 
 ## Setup
@@ -26,29 +49,25 @@ conda activate nlb
 make setup
 ```
 
-This installs the project into the conda env and keeps heavy dependencies out of `base`.
-
 ## Data path contract
 
-The runner expects NWB files under either:
-1. `data_path` in the config, or
-2. `NLB_DATA_DIR` plus a dataset-specific subpath
+The runner resolves data from either:
+1. `data_path` in the config
+2. `NLB_DATA_DIR` plus a dataset-specific default subpath
 
-For `mc_maze`, the default expected location is:
+For `mc_maze`, the expected default layout is:
 
 ```bash
 $NLB_DATA_DIR/000128/sub-Jenkins
 ```
 
-The pipeline validates that matching files exist for:
+The pipeline validates that matching NWB files exist for:
 
 ```bash
 <resolved_data_path>/<data_prefix>*.nwb
 ```
 
-If the path cannot be resolved, or if no NWB files match, the run fails early with a clear error.
-
-## Getting data
+## Downloading data
 
 Recommended:
 
@@ -57,37 +76,19 @@ python -m scripts.get_data --dataset mc_maze --out data/raw
 export NLB_DATA_DIR=$(pwd)/data/raw
 ```
 
-Or download the dataset yourself and point `NLB_DATA_DIR` at the raw root.
-
-## Running experiments
-
-Current default config:
-
-```yaml
-model_type: pca_latent_regression
-dataset_name: mc_maze
-```
-
-Run with:
+## Running
 
 ```bash
 make run
 ```
 
-or:
+Equivalent:
 
 ```bash
 python -m scripts.run_experiment --config configs/mc_maze_smoothing.yaml
 ```
 
-The pipeline:
-1. loads NWB data with `nlb_tools.nwb_interface.NWBDataset`
-2. builds train/eval/target tensors with official `nlb_tools.make_tensors` helpers
-3. runs a reference parameter set
-4. runs CV to choose a selected parameter set for the active model type
-5. writes prediction `.h5` files and local evaluation metrics
-
-## Switching models
+## Switching model families
 
 Set `model_type` in `configs/mc_maze_smoothing.yaml` to one of:
 
@@ -95,7 +96,7 @@ Set `model_type` in `configs/mc_maze_smoothing.yaml` to one of:
 - `pca_latent_regression`
 - `ridge_direct`
 
-Model-specific params:
+Model-specific config keys:
 
 - `smoothing`
   - reference: `baseline.kern_sd_ms`, `baseline.alpha`
@@ -107,46 +108,38 @@ Model-specific params:
   - reference: `baseline.ridge_alpha`
   - CV grid: `improvement.ridge_alpha_grid`
 
-## Outputs
+## Current checked-in results
 
-Runs write to `results/mc_maze/`:
+The current saved results in `results/mc_maze/` come from `pca_latent_regression` with:
 
-- `metrics.csv`
-- `ablation.csv`
-- `summary.md`
-- `run_metadata.json`
-- `predictions/baseline_predictions.h5`
-- `predictions/improved_predictions.h5`
+- reference params: `n_components=10`, `ridge_alpha=0.1`
+- selected params: `n_components=10`, `ridge_alpha=0.1`
+- co-bps: `0.003868`
+- vel R2: `0.075521`
+- psth R2: `-24.147990`
 
-The filenames stay fixed for compatibility, even though logs refer to `reference` vs `selected` params.
+These results are stored in:
 
-## Evaluation
+- `results/mc_maze/metrics.csv`
+- `results/mc_maze/ablation.csv`
+- `results/mc_maze/summary.md`
 
-The project uses official `nlb_tools` evaluation utilities:
-
-- `make_train_input_tensors`
-- `make_eval_input_tensors`
-- `make_eval_target_tensors`
-- `evaluate`
-
-For `mc_maze`, the local evaluation split key is `mc_maze_split`.
+The prediction `.h5` files and full run metadata are intentionally ignored and are not committed.
 
 ## Tests
-
-Run:
 
 ```bash
 make test
 ```
 
-The test suite covers:
+Coverage includes:
 
 - import smoke tests
-- data path resolution
+- data path resolution tests
 - synthetic evaluation smoke tests
-- model output shape checks
-- parameter-sensitivity checks for smoothing, PCA latent regression, and ridge direct
+- shape and parameter-sensitivity tests for all implemented model families
 
-## Current status
+## Notes
 
-The codebase is beyond the original smoothing-only scaffold. The active config and latest saved results currently point at `pca_latent_regression`, while the other two model families are implemented and test-covered.
+- The output filenames remain `baseline_predictions.h5` and `improved_predictions.h5` for compatibility, but logs and summaries describe runs as `reference` and `selected`.
+- This repository is intended as a compact, laptop-feasible NLB project rather than a full benchmark sweep.
