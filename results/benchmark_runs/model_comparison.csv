@@ -1,0 +1,6 @@
+model_label,model_type,role,history_bins,n_components,ridge_alpha,input_transform,co_bps,vel_r2,psth_r2,source_metrics_path,source_row,scientific_note
+static PCA latent regression,pca_latent_regression,reference,,10,0.1,none,0.0038680972481445605,0.07552087936814766,,results/benchmark_runs/static_pca/metrics.csv,baseline,Static latent baseline; no temporal context.
+static direct ridge,ridge_direct,reference,,,0.1,none,-0.0334800021487025,0.07614880872615087,,results/benchmark_runs/static_ridge/metrics.csv,baseline,Direct one-bin regression is not competitive.
+lagged direct ridge (5 bins),lagged_ridge_direct,reference,5,,0.1,sqrt,-0.430059038486296,0.20073108645832333,,results/benchmark_runs/lagged_ridge_single/metrics.csv,baseline,Temporal history alone overfit without a latent bottleneck.
+lagged PCA latent regression (5 bins),lagged_pca_latent_regression,reference,5,20,0.1,sqrt_zscore,0.04176870805106905,0.2441094526839589,,results/benchmark_runs/lagged_pca_single/metrics.csv,baseline,Temporal context plus train-only conditioning gave the first real gain.
+lagged PCA latent regression (selected history),lagged_pca_latent_regression,selected,9,20,0.1,sqrt_zscore,0.04859667651088111,0.3730257369981418,,results/benchmark_runs/lagged_pca_history_sweep/metrics.csv,improved,Best validated model in the repo.

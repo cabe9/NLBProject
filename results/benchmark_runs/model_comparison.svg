@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="370" viewBox="0 0 980 370">
+<style>
+text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }
+.title { font-size: 24px; font-weight: 700; }
+.label { font-size: 14px; }
+.value { font-size: 13px; font-weight: 600; }
+.axis { stroke: #9aa4af; stroke-width: 1; }
+.grid { stroke: #e5e7eb; stroke-width: 1; }
+</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text class="title" x="30" y="30">mc_maze co-bps comparison</text>
+<line class="grid" x1="320.0" y1="30" x2="320.0" y2="330"/>
+<text class="label" x="320.0" y="352" text-anchor="middle">-0.48</text>
+<line class="grid" x1="810.9" y1="30" x2="810.9" y2="330"/>
+<text class="label" x="810.9" y="352" text-anchor="middle">0.00</text>
+<line class="grid" x1="910.0" y1="30" x2="910.0" y2="330"/>
+<text class="label" x="910.0" y="352" text-anchor="middle">0.10</text>
+<line class="axis" x1="810.9" y1="30" x2="810.9" y2="330"/>
+<text class="label" x="20" y="68.0" dominant-baseline="middle">static PCA latent regression</text>
+<rect x="810.9" y="56.0" width="4.0" height="24" rx="4" fill="#0f766e"/>
+<text class="value" x="822.9" y="68.0" dominant-baseline="middle" text-anchor="start">0.0039</text>
+<text class="label" x="20" y="124.0" dominant-baseline="middle">static direct ridge</text>
+<rect x="776.5" y="112.0" width="34.4" height="24" rx="4" fill="#b45309"/>
+<text class="value" x="768.5" y="124.0" dominant-baseline="middle" text-anchor="end">-0.0335</text>
+<text class="label" x="20" y="180.0" dominant-baseline="middle">lagged direct ridge (5 bins)</text>
+<rect x="369.2" y="168.0" width="441.7" height="24" rx="4" fill="#b45309"/>
+<text class="value" x="361.2" y="180.0" dominant-baseline="middle" text-anchor="end">-0.4301</text>
+<text class="label" x="20" y="236.0" dominant-baseline="middle">lagged PCA latent regression (5 bins)</text>
+<rect x="810.9" y="224.0" width="42.9" height="24" rx="4" fill="#0f766e"/>
+<text class="value" x="861.8" y="236.0" dominant-baseline="middle" text-anchor="start">0.0418</text>
+<text class="label" x="20" y="292.0" dominant-baseline="middle">lagged PCA latent regression (selected history)</text>
+<rect x="810.9" y="280.0" width="49.9" height="24" rx="4" fill="#0f766e"/>
+<text class="value" x="868.8" y="292.0" dominant-baseline="middle" text-anchor="start">0.0486</text>
+</svg>

@@ -1,11 +1,11 @@
-model_type: pca_latent_regression
+model_type: lagged_ridge_direct
 dataset_name: mc_maze
-data_path: null
+data_path: data/raw/000128/sub-Jenkins
 data_prefix: "*full"
 bin_size_ms: 5
 train_split: train
 eval_split: val
-include_psth: true
+include_psth: false
 log_offset: 0.0001
 seed: 0
 skip_fields:
@@ -18,10 +18,12 @@ skip_fields:
   - joint_ang
   - force
 baseline:
-  n_components: 10
+  history_bins: 5
   ridge_alpha: 0.1
+  input_transform: sqrt
 improvement:
-  cv_folds: 3
-  n_components_grid: [5, 10, 20, 30]
-  ridge_alpha_grid: [0.001, 0.01, 0.1, 1.0]
-output_dir: results/mc_maze
+  cv_folds: 2
+  history_bins_grid: [3, 5]
+  ridge_alpha_grid: [0.01, 0.1]
+  input_transform: sqrt
+output_dir: results/benchmark_runs/lagged_ridge

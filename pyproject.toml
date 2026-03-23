@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nlb-project"
 version = "0.1.0"
-description = "Reproducible NLB'21 baseline + improvement project"
+description = "Compact, reproducible NLB'21 neural latent modeling project"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Caleb Telander"}]

@@ -19,6 +19,7 @@ def write_metrics_csv(rows: list[dict], out_path: str | Path) -> None:
 def write_summary_md(rows: list[dict], out_path: str | Path) -> None:
     df = pd.DataFrame(rows)
     model_type = df["model_type"].iloc[0] if "model_type" in df.columns and not df.empty else "unknown"
+    label_map = {"baseline": "reference", "improved": "selected"}
 
     def _fmt(value: object) -> str:
         if value is None or pd.isna(value):
@@ -34,8 +35,9 @@ def write_summary_md(rows: list[dict], out_path: str | Path) -> None:
         "|---|---:|---:|---:|---|",
     ]
     for _, row in df.iterrows():
+        model_label = label_map.get(row["model"], row["model"])
         lines.append(
-            f"| {row['model']} | {_fmt(row.get('co-bps'))} | {_fmt(row.get('vel R2'))} | {_fmt(row.get('psth R2'))} | {row.get('params', '')} |"
+            f"| {model_label} | {_fmt(row.get('co-bps'))} | {_fmt(row.get('vel R2'))} | {_fmt(row.get('psth R2'))} | {row.get('params', '')} |"
         )
     selected = df[df["model"] == "improved"].iloc[0]
     reference = df[df["model"] == "baseline"].iloc[0]

@@ -13,6 +13,13 @@ dist/
 
 # Data and generated outputs
 data/raw/
-results/mc_maze/predictions/*.h5
-results/mc_maze/run_metadata.json
+results/**/predictions/*.h5
+results/**/run_metadata.json
+results/benchmark_runs/*/*
+!results/benchmark_runs/*/metrics.csv
+!results/benchmark_runs/model_comparison.csv
+!results/benchmark_runs/model_comparison.md
+!results/benchmark_runs/model_comparison.svg
+!results/benchmark_runs/model_diagnostics.svg
+!results/benchmark_runs/experiment_log.md
 requirements/requirements.lock

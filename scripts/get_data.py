@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 _DATASET_URLS = {
-    "mc_maze": "https://dandiarchive.org/dandiset/000128/draft",
+    "mc_maze": "https://dandiarchive.org/dandiset/000128/0.220113.0400",
 }
 
 

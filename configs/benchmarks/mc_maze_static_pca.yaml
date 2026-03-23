@@ -1,0 +1,27 @@
+model_type: pca_latent_regression
+dataset_name: mc_maze
+data_path: data/raw/000128/sub-Jenkins
+data_prefix: "*full"
+bin_size_ms: 5
+train_split: train
+eval_split: val
+include_psth: false
+log_offset: 0.0001
+seed: 0
+skip_fields:
+  - hand_pos
+  - cursor_pos
+  - eye_pos
+  - muscle_vel
+  - muscle_len
+  - joint_vel
+  - joint_ang
+  - force
+baseline:
+  n_components: 10
+  ridge_alpha: 0.1
+improvement:
+  cv_folds: 2
+  n_components_grid: [10]
+  ridge_alpha_grid: [0.1]
+output_dir: results/benchmark_runs/static_pca

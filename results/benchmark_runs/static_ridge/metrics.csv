@@ -1,0 +1,3 @@
+model,model_type,co-bps,vel R2,psth R2,params
+baseline,ridge_direct,-0.0334800021487025,0.07614880872615087,,"{""ridge_alpha"": 0.1}"
+improved,ridge_direct,-0.0334800021487025,0.07614880872615087,,"{""ridge_alpha"": 0.1}"
