@@ -303,8 +303,9 @@ def _metric_bar_svg(
         return x_offset + left + ((value - min_plot) / (max_plot - min_plot)) * plot_w
 
     zero_x = x_pos(0.0)
+    panel_title_y = top - 18
     parts = [
-        f'<text class="panel-title" x="{x_offset + 20}" y="30">{title}</text>',
+        f'<text class="panel-title" x="{x_offset + 20}" y="{panel_title_y}">{title}</text>',
     ]
     for tick in [min_plot, 0.0, max_plot]:
         x = x_pos(tick)
@@ -343,7 +344,7 @@ def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> 
     panel_width = 980
     left = 310
     right = 50
-    top = 55
+    top = 70
     row_h = 56
     bar_h = 24
     bottom = 50
@@ -363,7 +364,7 @@ def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> 
         ".grid { stroke: #e5e7eb; stroke-width: 1; }",
         "</style>",
         '<rect width="100%" height="100%" fill="#ffffff"/>',
-        '<text class="title" x="30" y="30">mc_maze model diagnostics</text>',
+        '<text class="title" x="30" y="34">mc_maze model diagnostics</text>',
     ]
     parts.extend(
         _metric_bar_svg(rows, "co_bps", "co-bps", panel_width, left, right, top, row_h, bar_h, bottom, x_offset=0)
