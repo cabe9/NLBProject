@@ -1,5 +1,7 @@
 # Neural Latents Benchmark (`mc_maze`) Portfolio Project
 
+[![CI](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml/badge.svg)](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml)
+
 This repository is a compact, reproducible Neural Latents Benchmark (`NLB'21`) project focused on `mc_maze`.
 
 The project goal is simple:
