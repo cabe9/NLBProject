@@ -1,15 +1,12 @@
-# Neural Latents Benchmark (`mc_maze`) Portfolio Project
+# Neural Latents Benchmark (`mc_maze`) Analysis
 
 [![CI](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml/badge.svg)](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml)
 
-This repository is a compact, reproducible Neural Latents Benchmark (`NLB'21`) project focused on `mc_maze`.
+This repository trains lightweight linear and latent models on the Neural Latents Benchmark (`NLB'21`) `mc_maze` dataset to predict held-out neural firing rates from held-in population activity.
 
-The project goal is simple:
-- keep the official NLB loading and evaluation path intact
-- compare a few interpretable linear / latent baselines
-- identify one technically justified modeling change that materially improves co-smoothing
+It uses the official `nlb_tools` tensor-building and evaluation path, scores models with `co-bps` plus `vel R2` / `psth R2`, and writes tracked metrics tables and comparison figures under `results/`.
 
-The strongest validated result in the repo is a **lagged PCA latent regression** model. It improves substantially over the original static PCA baseline while preserving benchmark compatibility.
+The strongest validated result in the repo is a **lagged PCA latent regression** model, which improves materially over the original static PCA baseline without changing the benchmark protocol.
 
 ## Project goal
 
