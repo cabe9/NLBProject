@@ -1,0 +1,31 @@
+model_type: lagged_reduced_rank_regression
+dataset_name: mc_maze
+data_path: null
+data_prefix: "*full"
+bin_size_ms: 5
+train_split: train
+eval_split: val
+include_psth: false
+log_offset: 0.0001
+seed: 0
+skip_fields:
+  - hand_pos
+  - cursor_pos
+  - eye_pos
+  - muscle_vel
+  - muscle_len
+  - joint_vel
+  - joint_ang
+  - force
+baseline:
+  history_bins: 5
+  rank: 10
+  ridge_alpha: 0.1
+  input_transform: sqrt_zscore
+improvement:
+  cv_folds: 2
+  history_bins_grid: [5, 9]
+  rank_grid: [5, 10, 20]
+  ridge_alpha_grid: [0.01, 0.1]
+  input_transform: sqrt_zscore
+output_dir: results/benchmark_runs/lagged_rrr_sweep

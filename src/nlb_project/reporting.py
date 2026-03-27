@@ -44,6 +44,12 @@ DEFAULT_COMPARISON_SPECS = [
         note="Temporal history alone overfit without a latent bottleneck.",
     ),
     ComparisonSpec(
+        label="lagged reduced-rank regression (selected)",
+        metrics_path="results/benchmark_runs/lagged_rrr_sweep/metrics.csv",
+        model_row="improved",
+        note="A supervised low-rank mapping stayed worse than lagged PCA on co-bps.",
+    ),
+    ComparisonSpec(
         label="lagged PCA latent regression (5 bins)",
         metrics_path="results/benchmark_runs/lagged_pca_single/metrics.csv",
         model_row="baseline",
@@ -88,6 +94,7 @@ def build_comparison_rows(
                 "model_type": metric_row["model_type"],
                 "role": "reference" if spec.model_row == "baseline" else "selected",
                 "history_bins": params.get("history_bins", ""),
+                "rank": params.get("rank", ""),
                 "n_components": params.get("n_components", ""),
                 "ridge_alpha": params.get("ridge_alpha", ""),
                 "input_transform": params.get("input_transform", "none"),
@@ -116,6 +123,7 @@ def write_comparison_csv(rows: list[dict[str, Any]], out_path: str | Path) -> No
         "model_type",
         "role",
         "history_bins",
+        "rank",
         "n_components",
         "ridge_alpha",
         "input_transform",
@@ -139,16 +147,17 @@ def write_comparison_md(rows: list[dict[str, Any]], out_path: str | Path) -> Non
         "Generated from saved `metrics.csv` artifacts in `results/benchmark_runs/*/`.",
         "The only manual part is the comparison manifest in `src/nlb_project/reporting.py`, which selects which saved run rows to display.",
         "",
-        "| model | role | history bins | n_components | ridge_alpha | transform | co-bps | vel R2 | source |",
-        "|---|---|---:|---:|---:|---|---:|---:|---|",
+        "| model | role | history bins | rank | n_components | ridge_alpha | transform | co-bps | vel R2 | source |",
+        "|---|---|---:|---:|---:|---:|---|---:|---:|---|",
     ]
     for row in rows:
         lines.append(
-            "| {model_label} | {role} | {history_bins} | {n_components} | {ridge_alpha} | "
+            "| {model_label} | {role} | {history_bins} | {rank} | {n_components} | {ridge_alpha} | "
             "{input_transform} | {co_bps} | {vel_r2} | `{source_metrics_path}` ({source_row}) |".format(
                 model_label=row["model_label"],
                 role=row["role"],
                 history_bins=row["history_bins"] or "n/a",
+                rank=row["rank"] or "n/a",
                 n_components=row["n_components"] or "n/a",
                 ridge_alpha=row["ridge_alpha"] or "n/a",
                 input_transform=row["input_transform"] or "none",
@@ -164,6 +173,7 @@ def write_comparison_md(rows: list[dict[str, Any]], out_path: str | Path) -> Non
             "Takeaway:",
             "- The winning change was adding short neural history and compressing that history before regression.",
             "- Temporal context mattered more than static latent dimensionality alone.",
+            "- A supervised reduced-rank mapping did not recover the same co-smoothing gain as lagged PCA.",
         ]
     )
     Path(out_path).write_text("\n".join(lines), encoding="utf-8")
@@ -207,6 +217,7 @@ def write_experiment_log_md(
             "- The original static PCA model was weak because it ignored short-timescale neural history.",
             "- Direct lagged ridge showed that temporal context alone is not enough; the lagged design needs compression.",
             "- Lagged PCA latent regression was the first model family that improved co-smoothing substantially while remaining simple and interpretable.",
+            "- Lagged reduced-rank regression did not beat lagged PCA, which suggests the PCA bottleneck was already a better fit than this simple supervised low-rank mapping.",
         ]
     )
     Path(out_path).write_text("\n".join(lines), encoding="utf-8")
@@ -258,131 +269,102 @@ def write_comparison_svg(rows: list[dict[str, Any]], out_path: str | Path) -> No
 
     for idx, row in enumerate(rows):
         y = top + idx * row_h
-        cy = y + row_h / 2
+        bar_y = y + 14
         value = float(row["co_bps"])
-        bar_start = min(zero_x, x_pos(value))
-        bar_width = abs(x_pos(value) - zero_x)
+        x0 = min(zero_x, x_pos(value))
+        bar_w = abs(x_pos(value) - zero_x)
         color = "#0f766e" if value >= 0 else "#b45309"
-        parts.append(f'<text class="label" x="20" y="{cy:.1f}" dominant-baseline="middle">{row["model_label"]}</text>')
-        parts.append(
-            f'<rect x="{bar_start:.1f}" y="{cy - bar_h / 2:.1f}" width="{max(bar_width, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>'
-        )
+        parts.append(f'<text class="label" x="20" y="{y + 30}">{row["model_label"]}</text>')
+        parts.append(f'<rect x="{x0:.1f}" y="{bar_y}" width="{max(bar_w, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>')
         anchor = "start" if value >= 0 else "end"
-        label_x = x_pos(value) + 8 if value >= 0 else x_pos(value) - 8
+        dx = 10 if value >= 0 else -10
         parts.append(
-            f'<text class="value" x="{label_x:.1f}" y="{cy:.1f}" dominant-baseline="middle" text-anchor="{anchor}">{value:.4f}</text>'
+            f'<text class="value" x="{x_pos(value) + dx:.1f}" y="{bar_y + 17}" text-anchor="{anchor}">{value:.4f}</text>'
         )
 
     parts.append("</svg>")
     Path(out_path).write_text("\n".join(parts), encoding="utf-8")
 
 
-def _metric_bar_svg(
-    rows: list[dict[str, Any]],
-    metric_key: str,
-    title: str,
-    width: int,
-    left: int,
-    right: int,
-    top: int,
-    row_h: int,
-    bar_h: int,
-    bottom: int,
-    x_offset: int = 0,
-) -> list[str]:
-    values = [float(row[metric_key]) for row in rows if row[metric_key] is not None]
-    min_val = min(0.0, min(values))
-    max_val = max(values)
-    span = max_val - min_val
-    pad = span * 0.1 if span > 0 else 0.1
-    min_plot = min_val - pad
-    max_plot = max_val + pad
-    plot_w = width - left - right
-
-    def x_pos(value: float) -> float:
-        return x_offset + left + ((value - min_plot) / (max_plot - min_plot)) * plot_w
-
-    zero_x = x_pos(0.0)
-    panel_title_y = top - 18
-    parts = [
-        f'<text class="panel-title" x="{x_offset + 20}" y="{panel_title_y}">{title}</text>',
-    ]
-    for tick in [min_plot, 0.0, max_plot]:
-        x = x_pos(tick)
-        parts.append(f'<line class="grid" x1="{x:.1f}" y1="{top - 10}" x2="{x:.1f}" y2="{top + row_h * len(rows) + 10}"/>')
-        parts.append(
-            f'<text class="label" x="{x:.1f}" y="{top + row_h * len(rows) + 34}" text-anchor="middle">{tick:.2f}</text>'
-        )
-    parts.append(f'<line class="axis" x1="{zero_x:.1f}" y1="{top - 10}" x2="{zero_x:.1f}" y2="{top + row_h * len(rows) + 10}"/>')
-
-    for idx, row in enumerate(rows):
-        y = top + idx * row_h
-        cy = y + row_h / 2
-        value = row[metric_key]
-        parts.append(f'<text class="label" x="{x_offset + 20}" y="{cy:.1f}" dominant-baseline="middle">{row["model_label"]}</text>')
-        if value is None:
-            parts.append(
-                f'<text class="value" x="{x_offset + left + 10}" y="{cy:.1f}" dominant-baseline="middle">n/a</text>'
-            )
-            continue
-        value = float(value)
-        bar_start = min(zero_x, x_pos(value))
-        bar_width = abs(x_pos(value) - zero_x)
-        color = "#0f766e" if value >= 0 else "#b45309"
-        parts.append(
-            f'<rect x="{bar_start:.1f}" y="{cy - bar_h / 2:.1f}" width="{max(bar_width, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>'
-        )
-        anchor = "start" if value >= 0 else "end"
-        label_x = x_pos(value) + 8 if value >= 0 else x_pos(value) - 8
-        parts.append(
-            f'<text class="value" x="{label_x:.1f}" y="{cy:.1f}" dominant-baseline="middle" text-anchor="{anchor}">{value:.4f}</text>'
-        )
-    return parts
-
-
 def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> None:
-    panel_width = 980
-    left = 310
-    right = 50
-    top = 70
-    row_h = 56
-    bar_h = 24
-    bottom = 50
-    gutter = 40
-    width = panel_width * 2 + gutter
-    height = top + bottom + row_h * len(rows)
+    width = 1680
+    height = 430
+    panel_gap = 48
+    panel_width = (width - 80 - panel_gap) // 2
+    left_margin = 24
+    top = 78
+    row_h = 48
+    bar_h = 22
+    bottom = 48
+    max_rows = len(rows)
+    chart_top = top + 38
+    chart_height = row_h * max_rows
+
+    def _panel(values_key: str, title: str, x_offset: int) -> list[str]:
+        values = [float(row[values_key]) if row[values_key] is not None else 0.0 for row in rows]
+        min_val = min(0.0, min(values))
+        max_val = max(values)
+        span = max_val - min_val
+        pad = span * 0.1 if span > 0 else 0.1
+        min_plot = min_val - pad
+        max_plot = max_val + pad
+        plot_left = x_offset + 260
+        plot_right = x_offset + panel_width - 24
+        plot_width = plot_right - plot_left
+
+        def x_pos(value: float) -> float:
+            return plot_left + ((value - min_plot) / (max_plot - min_plot)) * plot_width
+
+        zero_x = x_pos(0.0)
+        parts: list[str] = [
+            f'<text class="panel-title" x="{x_offset + left_margin}" y="{top - 18}">{title}</text>',
+        ]
+        for tick in [min_plot, 0.0, max_plot]:
+            x = x_pos(tick)
+            parts.append(
+                f'<line class="grid" x1="{x:.1f}" y1="{chart_top - 18}" x2="{x:.1f}" y2="{chart_top + chart_height - 4}"/>'
+            )
+            parts.append(
+                f'<text class="tick" x="{x:.1f}" y="{height - 14}" text-anchor="middle">{tick:.2f}</text>'
+            )
+        parts.append(
+            f'<line class="axis" x1="{zero_x:.1f}" y1="{chart_top - 18}" x2="{zero_x:.1f}" y2="{chart_top + chart_height - 4}"/>'
+        )
+        for idx, row in enumerate(rows):
+            y = chart_top + idx * row_h
+            value = float(row[values_key]) if row[values_key] is not None else 0.0
+            x0 = min(zero_x, x_pos(value))
+            bar_w = abs(x_pos(value) - zero_x)
+            color = "#0f766e" if value >= 0 else "#b45309"
+            parts.append(
+                f'<text class="label" x="{x_offset + left_margin}" y="{y + 18}">{row["model_label"]}</text>'
+            )
+            parts.append(
+                f'<rect x="{x0:.1f}" y="{y + 6}" width="{max(bar_w, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>'
+            )
+            anchor = "start" if value >= 0 else "end"
+            dx = 10 if value >= 0 else -10
+            parts.append(
+                f'<text class="value" x="{x_pos(value) + dx:.1f}" y="{y + 21}" text-anchor="{anchor}">{value:.4f}</text>'
+            )
+        return parts
 
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
-        "<style>",
-        "text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }",
-        ".title { font-size: 24px; font-weight: 700; }",
-        ".panel-title { font-size: 18px; font-weight: 700; }",
-        ".label { font-size: 14px; }",
-        ".value { font-size: 13px; font-weight: 600; }",
-        ".axis { stroke: #9aa4af; stroke-width: 1; }",
-        ".grid { stroke: #e5e7eb; stroke-width: 1; }",
-        "</style>",
+        '<style>',
+        'text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }',
+        '.title { font-size: 18px; font-weight: 700; }',
+        '.panel-title { font-size: 14px; font-weight: 700; }',
+        '.label { font-size: 12px; }',
+        '.tick { font-size: 11px; fill: #374151; }',
+        '.value { font-size: 12px; font-weight: 600; }',
+        '.axis { stroke: #9aa4af; stroke-width: 1; }',
+        '.grid { stroke: #e5e7eb; stroke-width: 1; }',
+        '</style>',
         '<rect width="100%" height="100%" fill="#ffffff"/>',
-        '<text class="title" x="30" y="34">mc_maze model diagnostics</text>',
+        '<text class="title" x="24" y="34">mc_maze model diagnostics</text>',
     ]
-    parts.extend(
-        _metric_bar_svg(rows, "co_bps", "co-bps", panel_width, left, right, top, row_h, bar_h, bottom, x_offset=0)
-    )
-    parts.extend(
-        _metric_bar_svg(
-            rows,
-            "vel_r2",
-            "vel R2",
-            panel_width,
-            left,
-            right,
-            top,
-            row_h,
-            bar_h,
-            bottom,
-            x_offset=panel_width + gutter,
-        )
-    )
+    parts.extend(_panel("co_bps", "co-bps", 0))
+    parts.extend(_panel("vel_r2", "vel R2", panel_width + panel_gap))
     parts.append("</svg>")
     Path(out_path).write_text("\n".join(parts), encoding="utf-8")

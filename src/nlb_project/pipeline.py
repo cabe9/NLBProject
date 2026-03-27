@@ -24,6 +24,7 @@ from .data_contract import resolve_data_path
 from .io_utils import ensure_dir, write_metrics_csv, write_summary_md
 from .models import (
     predict_lagged_pca_latent_regression,
+    predict_lagged_reduced_rank_regression,
     predict_lagged_ridge_direct,
     predict_pca_latent_regression,
     predict_ridge_direct,
@@ -128,11 +129,22 @@ def _run_single_eval(
             history_bins=params["history_bins"],
             input_transform=params["input_transform"],
         )
+    elif cfg.model_type == "lagged_reduced_rank_regression":
+        preds = predict_lagged_reduced_rank_regression(
+            train_dict["train_spikes_heldin"],
+            train_dict["train_spikes_heldout"],
+            eval_dict["eval_spikes_heldin"],
+            rank=params["rank"],
+            ridge_alpha=params["ridge_alpha"],
+            history_bins=params["history_bins"],
+            input_transform=params["input_transform"],
+        )
     else:
         raise ValueError(
             f"Unsupported model_type `{cfg.model_type}`. Expected one of "
             f"['smoothing', 'pca_latent_regression', 'ridge_direct', "
-            f"'lagged_ridge_direct', 'lagged_pca_latent_regression']."
+            f"'lagged_ridge_direct', 'lagged_pca_latent_regression', "
+            f"'lagged_reduced_rank_regression']."
         )
 
     output_dict = {_dataset_key(cfg.dataset_name, cfg.bin_size_ms): preds}
@@ -395,6 +407,66 @@ def _select_best_lagged_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -
     return best_params
 
 
+def _select_best_lagged_rrr_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
+    imp = cfg.improvement
+    cv_folds = imp.get("cv_folds", 3)
+    history_bins_grid = imp.get("history_bins_grid", [3, 5, 9])
+    rank_grid = imp.get("rank_grid", [5, 10, 20, 40])
+    ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1, 1.0])
+    input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
+    folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
+
+    best_score = -np.inf
+    best_params: dict[str, Any] | None = None
+    for history_bins, rank, ridge_alpha in itertools.product(
+        history_bins_grid, rank_grid, ridge_alpha_grid
+    ):
+        fold_scores = []
+        params = {
+            "history_bins": int(history_bins),
+            "rank": int(rank),
+            "ridge_alpha": float(ridge_alpha),
+            "input_transform": input_transform,
+        }
+        for train_mask, eval_mask in folds:
+            _, metrics = _run_single_eval(
+                dataset,
+                cfg,
+                train_mask,
+                eval_mask,
+                params,
+                include_psth=False,
+                run_name=(
+                    f"cv(history_bins={history_bins},rank={rank},"
+                    f"ridge_alpha={ridge_alpha})"
+                ),
+            )
+            fold_scores.append(metrics["co-bps"])
+        mean_score = float(np.mean(fold_scores))
+        logger.info(
+            "CV candidate history_bins=%s rank=%s ridge_alpha=%s input_transform=%s -> mean co-bps %.4f",
+            history_bins,
+            rank,
+            ridge_alpha,
+            input_transform,
+            mean_score,
+        )
+        if mean_score > best_score:
+            best_score = mean_score
+            best_params = params
+
+    assert best_params is not None
+    logger.info(
+        "Selected params for lagged reduced-rank regression: history_bins=%s rank=%s ridge_alpha=%s input_transform=%s (cv mean co-bps %.4f)",
+        best_params["history_bins"],
+        best_params["rank"],
+        best_params["ridge_alpha"],
+        best_params["input_transform"],
+        best_score,
+    )
+    return best_params
+
+
 def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
     set_seeds(cfg.seed)
     out_dir = ensure_dir(cfg.output_dir)
@@ -439,11 +511,20 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
             "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
         }
         selected_params = _select_best_lagged_pca_params(dataset, cfg)
+    elif cfg.model_type == "lagged_reduced_rank_regression":
+        reference_params = {
+            "history_bins": int(cfg.baseline.get("history_bins", 5)),
+            "rank": int(cfg.baseline.get("rank", 10)),
+            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
+            "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
+        }
+        selected_params = _select_best_lagged_rrr_params(dataset, cfg)
     else:
         raise ValueError(
             f"Unsupported model_type `{cfg.model_type}`. Expected one of "
             f"['smoothing', 'pca_latent_regression', 'ridge_direct', "
-            f"'lagged_ridge_direct', 'lagged_pca_latent_regression']."
+            f"'lagged_ridge_direct', 'lagged_pca_latent_regression', "
+            f"'lagged_reduced_rank_regression']."
         )
 
     reference_output, reference_metrics = _run_single_eval(

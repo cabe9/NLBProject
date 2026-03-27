@@ -1,0 +1,3 @@
+model,model_type,co-bps,vel R2,psth R2,params
+baseline,lagged_reduced_rank_regression,-0.04952014127075757,0.17790662736655571,,"{""history_bins"": 5, ""input_transform"": ""sqrt_zscore"", ""rank"": 10, ""ridge_alpha"": 0.1}"
+improved,lagged_reduced_rank_regression,-0.009057627433083389,0.15944457408890028,,"{""history_bins"": 5, ""input_transform"": ""sqrt_zscore"", ""rank"": 5, ""ridge_alpha"": 0.1}"

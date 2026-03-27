@@ -1,59 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="400" viewBox="0 0 2000 400">
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="430" viewBox="0 0 1680 430">
 <style>
 text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }
-.title { font-size: 24px; font-weight: 700; }
-.panel-title { font-size: 18px; font-weight: 700; }
-.label { font-size: 14px; }
-.value { font-size: 13px; font-weight: 600; }
+.title { font-size: 18px; font-weight: 700; }
+.panel-title { font-size: 14px; font-weight: 700; }
+.label { font-size: 12px; }
+.tick { font-size: 11px; fill: #374151; }
+.value { font-size: 12px; font-weight: 600; }
 .axis { stroke: #9aa4af; stroke-width: 1; }
 .grid { stroke: #e5e7eb; stroke-width: 1; }
 </style>
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text class="title" x="30" y="34">mc_maze model diagnostics</text>
-<text class="panel-title" x="20" y="52">co-bps</text>
-<line class="grid" x1="310.0" y1="60" x2="310.0" y2="360"/>
-<text class="label" x="310.0" y="384" text-anchor="middle">-0.48</text>
-<line class="grid" x1="825.9" y1="60" x2="825.9" y2="360"/>
-<text class="label" x="825.9" y="384" text-anchor="middle">0.00</text>
-<line class="grid" x1="930.0" y1="60" x2="930.0" y2="360"/>
-<text class="label" x="930.0" y="384" text-anchor="middle">0.10</text>
-<line class="axis" x1="825.9" y1="60" x2="825.9" y2="360"/>
-<text class="label" x="20" y="98.0" dominant-baseline="middle">static PCA latent regression</text>
-<rect x="825.9" y="86.0" width="4.2" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="838.1" y="98.0" dominant-baseline="middle" text-anchor="start">0.0039</text>
-<text class="label" x="20" y="154.0" dominant-baseline="middle">static direct ridge</text>
-<rect x="789.7" y="142.0" width="36.1" height="24" rx="4" fill="#b45309"/>
-<text class="value" x="781.7" y="154.0" dominant-baseline="middle" text-anchor="end">-0.0335</text>
-<text class="label" x="20" y="210.0" dominant-baseline="middle">lagged direct ridge (5 bins)</text>
-<rect x="361.7" y="198.0" width="464.2" height="24" rx="4" fill="#b45309"/>
-<text class="value" x="353.7" y="210.0" dominant-baseline="middle" text-anchor="end">-0.4301</text>
-<text class="label" x="20" y="266.0" dominant-baseline="middle">lagged PCA latent regression (5 bins)</text>
-<rect x="825.9" y="254.0" width="45.1" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="879.0" y="266.0" dominant-baseline="middle" text-anchor="start">0.0418</text>
-<text class="label" x="20" y="322.0" dominant-baseline="middle">lagged PCA latent regression (selected history)</text>
-<rect x="825.9" y="310.0" width="52.5" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="886.3" y="322.0" dominant-baseline="middle" text-anchor="start">0.0486</text>
-<text class="panel-title" x="1040" y="52">vel R2</text>
-<line class="grid" x1="1330.0" y1="60" x2="1330.0" y2="360"/>
-<text class="label" x="1330.0" y="384" text-anchor="middle">-0.04</text>
-<line class="grid" x1="1381.7" y1="60" x2="1381.7" y2="360"/>
-<text class="label" x="1381.7" y="384" text-anchor="middle">0.00</text>
-<line class="grid" x1="1950.0" y1="60" x2="1950.0" y2="360"/>
-<text class="label" x="1950.0" y="384" text-anchor="middle">0.41</text>
-<line class="axis" x1="1381.7" y1="60" x2="1381.7" y2="360"/>
-<text class="label" x="1040" y="98.0" dominant-baseline="middle">static PCA latent regression</text>
-<rect x="1381.7" y="86.0" width="104.6" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="1494.3" y="98.0" dominant-baseline="middle" text-anchor="start">0.0755</text>
-<text class="label" x="1040" y="154.0" dominant-baseline="middle">static direct ridge</text>
-<rect x="1381.7" y="142.0" width="105.5" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="1495.1" y="154.0" dominant-baseline="middle" text-anchor="start">0.0761</text>
-<text class="label" x="1040" y="210.0" dominant-baseline="middle">lagged direct ridge (5 bins)</text>
-<rect x="1381.7" y="198.0" width="278.0" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="1667.7" y="210.0" dominant-baseline="middle" text-anchor="start">0.2007</text>
-<text class="label" x="1040" y="266.0" dominant-baseline="middle">lagged PCA latent regression (5 bins)</text>
-<rect x="1381.7" y="254.0" width="338.1" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="1727.8" y="266.0" dominant-baseline="middle" text-anchor="start">0.2441</text>
-<text class="label" x="1040" y="322.0" dominant-baseline="middle">lagged PCA latent regression (selected history)</text>
-<rect x="1381.7" y="310.0" width="516.7" height="24" rx="4" fill="#0f766e"/>
-<text class="value" x="1906.3" y="322.0" dominant-baseline="middle" text-anchor="start">0.3730</text>
+<text class="title" x="24" y="34">mc_maze model diagnostics</text>
+<text class="panel-title" x="24" y="60">co-bps</text>
+<line class="grid" x1="260.0" y1="98" x2="260.0" y2="400"/>
+<text class="tick" x="260.0" y="416" text-anchor="middle">-0.48</text>
+<line class="grid" x1="669.4" y1="98" x2="669.4" y2="400"/>
+<text class="tick" x="669.4" y="416" text-anchor="middle">0.00</text>
+<line class="grid" x1="752.0" y1="98" x2="752.0" y2="400"/>
+<text class="tick" x="752.0" y="416" text-anchor="middle">0.10</text>
+<line class="axis" x1="669.4" y1="98" x2="669.4" y2="400"/>
+<text class="label" x="24" y="134">static PCA latent regression</text>
+<rect x="669.4" y="122" width="3.3" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="682.7" y="137" text-anchor="start">0.0039</text>
+<text class="label" x="24" y="182">static direct ridge</text>
+<rect x="640.7" y="170" width="28.7" height="22" rx="4" fill="#b45309"/>
+<text class="value" x="630.7" y="185" text-anchor="end">-0.0335</text>
+<text class="label" x="24" y="230">lagged direct ridge (5 bins)</text>
+<rect x="301.0" y="218" width="368.4" height="22" rx="4" fill="#b45309"/>
+<text class="value" x="291.0" y="233" text-anchor="end">-0.4301</text>
+<text class="label" x="24" y="278">lagged reduced-rank regression (selected)</text>
+<rect x="661.6" y="266" width="7.8" height="22" rx="4" fill="#b45309"/>
+<text class="value" x="651.6" y="281" text-anchor="end">-0.0091</text>
+<text class="label" x="24" y="326">lagged PCA latent regression (5 bins)</text>
+<rect x="669.4" y="314" width="35.8" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="715.2" y="329" text-anchor="start">0.0418</text>
+<text class="label" x="24" y="374">lagged PCA latent regression (selected history)</text>
+<rect x="669.4" y="362" width="41.6" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="721.0" y="377" text-anchor="start">0.0486</text>
+<text class="panel-title" x="848" y="60">vel R2</text>
+<line class="grid" x1="1084.0" y1="98" x2="1084.0" y2="400"/>
+<text class="tick" x="1084.0" y="416" text-anchor="middle">-0.04</text>
+<line class="grid" x1="1125.0" y1="98" x2="1125.0" y2="400"/>
+<text class="tick" x="1125.0" y="416" text-anchor="middle">0.00</text>
+<line class="grid" x1="1576.0" y1="98" x2="1576.0" y2="400"/>
+<text class="tick" x="1576.0" y="416" text-anchor="middle">0.41</text>
+<line class="axis" x1="1125.0" y1="98" x2="1125.0" y2="400"/>
+<text class="label" x="848" y="134">static PCA latent regression</text>
+<rect x="1125.0" y="122" width="83.0" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="1218.0" y="137" text-anchor="start">0.0755</text>
+<text class="label" x="848" y="182">static direct ridge</text>
+<rect x="1125.0" y="170" width="83.7" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="1218.7" y="185" text-anchor="start">0.0761</text>
+<text class="label" x="848" y="230">lagged direct ridge (5 bins)</text>
+<rect x="1125.0" y="218" width="220.6" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="1355.6" y="233" text-anchor="start">0.2007</text>
+<text class="label" x="848" y="278">lagged reduced-rank regression (selected)</text>
+<rect x="1125.0" y="266" width="175.2" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="1310.2" y="281" text-anchor="start">0.1594</text>
+<text class="label" x="848" y="326">lagged PCA latent regression (5 bins)</text>
+<rect x="1125.0" y="314" width="268.3" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="1403.3" y="329" text-anchor="start">0.2441</text>
+<text class="label" x="848" y="374">lagged PCA latent regression (selected history)</text>
+<rect x="1125.0" y="362" width="410.0" height="22" rx="4" fill="#0f766e"/>
+<text class="value" x="1545.0" y="377" text-anchor="start">0.3730</text>
 </svg>

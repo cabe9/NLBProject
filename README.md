@@ -16,7 +16,7 @@ The central modeling question was:
 
 The current evidence in this repo says yes.
 
-Static PCA was weak. Static direct ridge was worse. Lagged direct ridge added temporal context but overfit the expanded feature space. Lagged PCA improved because it added short neural history and compressed that history before regressing to held-out neurons.
+Static PCA was weak. Static direct ridge was worse. Lagged direct ridge added temporal context but overfit the expanded feature space. A lagged reduced-rank regression control improved over raw lagged ridge but still stayed worse than lagged PCA on co-bps. Lagged PCA improved because it added short neural history and compressed that history before regressing to held-out neurons.
 
 ## Benchmark and evaluation path
 
@@ -71,12 +71,14 @@ The repo includes these lightweight model families:
 - `pca_latent_regression`
 - `ridge_direct`
 - `lagged_ridge_direct`
+- `lagged_reduced_rank_regression`
 - `lagged_pca_latent_regression`
 
 The portfolio comparison is intentionally narrow and reproducible:
 - static PCA latent regression
 - static direct ridge
 - lagged direct ridge (5 bins)
+- lagged reduced-rank regression (selected)
 - lagged PCA latent regression (5 bins)
 - lagged PCA latent regression (selected history)
 
@@ -91,6 +93,7 @@ Tracked benchmark source metrics used for regeneration:
 - `results/benchmark_runs/static_pca/metrics.csv`
 - `results/benchmark_runs/static_ridge/metrics.csv`
 - `results/benchmark_runs/lagged_ridge_single/metrics.csv`
+- `results/benchmark_runs/lagged_rrr_sweep/metrics.csv`
 - `results/benchmark_runs/lagged_pca_single/metrics.csv`
 - `results/benchmark_runs/lagged_pca_history_sweep/metrics.csv`
 
@@ -117,6 +120,7 @@ Skimmable table:
 Main takeaway:
 - temporal context mattered much more than static latent dimensionality alone
 - temporal context by itself was not enough; the lagged design needed latent compression
+- a supervised low-rank mapping helped less than the PCA bottleneck on this benchmark slice
 - the diagnostic panel shows why: lagged direct ridge improved `vel R2` but hurt `co-bps`, while lagged PCA improved both
 
 ## Why this matters for neural decoding
@@ -176,6 +180,7 @@ make test
 - `src/nlb_project/pipeline.py`: experiment orchestration
 - `src/nlb_project/models/`: model implementations
 - `src/nlb_project/models/lagged_pca_latent_regression.py`: strongest validated model
+- `src/nlb_project/models/lagged_reduced_rank_regression.py`: supervised low-rank control on the same lagged feature pipeline
 - `src/nlb_project/models/temporal_features.py`: lagged feature construction and train-only preprocessing
 - `src/nlb_project/reporting.py`: portfolio artifact generation from saved metrics
 - `scripts/run_experiment.py`: main CLI entrypoint
@@ -208,7 +213,10 @@ Current limitations:
 - the comparison set is intentionally small
 - the best model is still linear and not yet a dynamical latent model
 
-Most justified next step:
-- add reduced-rank regression on top of the same lagged feature pipeline
+Recent control result:
+- lagged reduced-rank regression was tested on the same feature pipeline and improved over raw lagged ridge, but it still did not beat lagged PCA on `co-bps`
 
-That would test whether the gain is coming mainly from temporal context, from the PCA bottleneck specifically, or from low-rank structure more generally.
+Most justified next step:
+- add a simple linear dynamical latent model or factor-analysis-style temporal latent model on the same benchmark path
+
+That would test whether the remaining gap is about low-rank structure alone, or about explicitly modeling latent dynamics over time.
