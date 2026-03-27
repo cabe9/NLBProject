@@ -224,8 +224,8 @@ def write_experiment_log_md(
 
 
 def write_comparison_svg(rows: list[dict[str, Any]], out_path: str | Path) -> None:
-    width = 980
-    left = 320
+    width = 1080
+    left = 390
     right = 70
     top = 40
     row_h = 56
@@ -277,9 +277,12 @@ def write_comparison_svg(rows: list[dict[str, Any]], out_path: str | Path) -> No
         parts.append(f'<text class="label" x="20" y="{y + 30}">{row["model_label"]}</text>')
         parts.append(f'<rect x="{x0:.1f}" y="{bar_y}" width="{max(bar_w, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>')
         anchor = "start" if value >= 0 else "end"
-        dx = 10 if value >= 0 else -10
+        if value >= 0:
+            label_x = max(x_pos(value) + 12, zero_x + 18)
+        else:
+            label_x = min(x_pos(value) - 12, zero_x - 18)
         parts.append(
-            f'<text class="value" x="{x_pos(value) + dx:.1f}" y="{bar_y + 17}" text-anchor="{anchor}">{value:.4f}</text>'
+            f'<text class="value" x="{label_x:.1f}" y="{bar_y + 17}" text-anchor="{anchor}">{value:.4f}</text>'
         )
 
     parts.append("</svg>")
@@ -287,7 +290,7 @@ def write_comparison_svg(rows: list[dict[str, Any]], out_path: str | Path) -> No
 
 
 def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> None:
-    width = 1680
+    width = 1820
     height = 430
     panel_gap = 48
     panel_width = (width - 80 - panel_gap) // 2
@@ -308,7 +311,7 @@ def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> 
         pad = span * 0.1 if span > 0 else 0.1
         min_plot = min_val - pad
         max_plot = max_val + pad
-        plot_left = x_offset + 260
+        plot_left = x_offset + 340
         plot_right = x_offset + panel_width - 24
         plot_width = plot_right - plot_left
 
@@ -343,9 +346,12 @@ def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> 
                 f'<rect x="{x0:.1f}" y="{y + 6}" width="{max(bar_w, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>'
             )
             anchor = "start" if value >= 0 else "end"
-            dx = 10 if value >= 0 else -10
+            if value >= 0:
+                label_x = max(x_pos(value) + 12, zero_x + 18)
+            else:
+                label_x = min(x_pos(value) - 12, zero_x - 18)
             parts.append(
-                f'<text class="value" x="{x_pos(value) + dx:.1f}" y="{y + 21}" text-anchor="{anchor}">{value:.4f}</text>'
+                f'<text class="value" x="{label_x:.1f}" y="{y + 21}" text-anchor="{anchor}">{value:.4f}</text>'
             )
         return parts
 
