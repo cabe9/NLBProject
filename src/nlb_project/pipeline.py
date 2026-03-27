@@ -23,6 +23,7 @@ from .config import ExperimentConfig
 from .data_contract import resolve_data_path
 from .io_utils import ensure_dir, write_metrics_csv, write_summary_md
 from .models import (
+    predict_lds_pca_latent_regression,
     predict_lagged_pca_latent_regression,
     predict_lagged_reduced_rank_regression,
     predict_lagged_ridge_direct,
@@ -139,12 +140,22 @@ def _run_single_eval(
             history_bins=params["history_bins"],
             input_transform=params["input_transform"],
         )
+    elif cfg.model_type == "lds_pca_latent_regression":
+        preds = predict_lds_pca_latent_regression(
+            train_dict["train_spikes_heldin"],
+            train_dict["train_spikes_heldout"],
+            eval_dict["eval_spikes_heldin"],
+            n_components=params["n_components"],
+            ridge_alpha=params["ridge_alpha"],
+            input_transform=params["input_transform"],
+            obs_noise_scale=params["obs_noise_scale"],
+        )
     else:
         raise ValueError(
             f"Unsupported model_type `{cfg.model_type}`. Expected one of "
             f"['smoothing', 'pca_latent_regression', 'ridge_direct', "
             f"'lagged_ridge_direct', 'lagged_pca_latent_regression', "
-            f"'lagged_reduced_rank_regression']."
+            f"'lagged_reduced_rank_regression', 'lds_pca_latent_regression']."
         )
 
     output_dict = {_dataset_key(cfg.dataset_name, cfg.bin_size_ms): preds}
@@ -467,6 +478,61 @@ def _select_best_lagged_rrr_params(dataset: NWBDataset, cfg: ExperimentConfig) -
     return best_params
 
 
+def _select_best_lds_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
+    imp = cfg.improvement
+    cv_folds = imp.get("cv_folds", 2)
+    n_components_grid = imp.get("n_components_grid", [5, 10, 20])
+    ridge_alpha = float(imp.get("ridge_alpha", cfg.baseline.get("ridge_alpha", 0.1)))
+    input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
+    obs_noise_scale = float(imp.get("obs_noise_scale", cfg.baseline.get("obs_noise_scale", 0.1)))
+    folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
+
+    best_score = -np.inf
+    best_params: dict[str, Any] | None = None
+    for n_components in n_components_grid:
+        fold_scores = []
+        params = {
+            "n_components": int(n_components),
+            "ridge_alpha": ridge_alpha,
+            "input_transform": input_transform,
+            "obs_noise_scale": obs_noise_scale,
+        }
+        for train_mask, eval_mask in folds:
+            _, metrics = _run_single_eval(
+                dataset,
+                cfg,
+                train_mask,
+                eval_mask,
+                params,
+                include_psth=False,
+                run_name=f"cv(n_components={n_components})",
+            )
+            fold_scores.append(metrics["co-bps"])
+        mean_score = float(np.mean(fold_scores))
+        logger.info(
+            "CV candidate n_components=%s ridge_alpha=%s input_transform=%s obs_noise_scale=%s -> mean co-bps %.4f",
+            n_components,
+            ridge_alpha,
+            input_transform,
+            obs_noise_scale,
+            mean_score,
+        )
+        if mean_score > best_score:
+            best_score = mean_score
+            best_params = params
+
+    assert best_params is not None
+    logger.info(
+        "Selected params for LDS PCA latent regression: n_components=%s ridge_alpha=%s input_transform=%s obs_noise_scale=%s (cv mean co-bps %.4f)",
+        best_params["n_components"],
+        best_params["ridge_alpha"],
+        best_params["input_transform"],
+        best_params["obs_noise_scale"],
+        best_score,
+    )
+    return best_params
+
+
 def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
     set_seeds(cfg.seed)
     out_dir = ensure_dir(cfg.output_dir)
@@ -519,12 +585,20 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
             "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
         }
         selected_params = _select_best_lagged_rrr_params(dataset, cfg)
+    elif cfg.model_type == "lds_pca_latent_regression":
+        reference_params = {
+            "n_components": int(cfg.baseline.get("n_components", 10)),
+            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
+            "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
+            "obs_noise_scale": float(cfg.baseline.get("obs_noise_scale", 0.1)),
+        }
+        selected_params = _select_best_lds_pca_params(dataset, cfg)
     else:
         raise ValueError(
             f"Unsupported model_type `{cfg.model_type}`. Expected one of "
             f"['smoothing', 'pca_latent_regression', 'ridge_direct', "
             f"'lagged_ridge_direct', 'lagged_pca_latent_regression', "
-            f"'lagged_reduced_rank_regression']."
+            f"'lagged_reduced_rank_regression', 'lds_pca_latent_regression']."
         )
 
     reference_output, reference_metrics = _run_single_eval(

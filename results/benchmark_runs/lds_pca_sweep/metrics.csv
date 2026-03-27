@@ -1,0 +1,3 @@
+model,model_type,co-bps,vel R2,psth R2,params
+baseline,lds_pca_latent_regression,0.012703220476185056,0.07505384491880213,,"{""input_transform"": ""sqrt_zscore"", ""n_components"": 10, ""obs_noise_scale"": 0.1, ""ridge_alpha"": 0.1}"
+improved,lds_pca_latent_regression,0.012833616533740913,0.07464265341851456,,"{""input_transform"": ""sqrt_zscore"", ""n_components"": 5, ""obs_noise_scale"": 0.1, ""ridge_alpha"": 0.1}"
