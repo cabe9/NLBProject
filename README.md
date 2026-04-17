@@ -52,12 +52,29 @@ Reference configuration:
 - `n_components=20`
 - `ridge_alpha=0.1`
 - `input_transform=sqrt_zscore`
+- `output_head=log_link`
+- `log_offset=0.001`
 
 Selected configuration:
 - `history_bins=9`
 - `n_components=20`
 - `ridge_alpha=0.1`
 - `input_transform=sqrt_zscore`
+- `output_head=log_link`
+- `log_offset=0.001`
+
+### Rate readout (`output_head`)
+
+All regression models share a pluggable rate readout defined in
+`src/nlb_project/models/output_head.py`. The default is `log_link`: ridge
+regression is fit on `log(count + log_offset)` and predictions are
+exponentiated at inference, guaranteeing strictly positive rates. This is
+the co-bps-correct default.
+
+The legacy `linear` head (Gaussian ridge on raw counts, clipped at `1e-9`)
+is retained for ablations only. To reproduce the old numbers, add
+`output_head: linear` to the `baseline` and `improvement` sections of a
+config. Runs record the effective head in `run_metadata.json`.
 
 Canonical saved outputs:
 - `results/mc_maze/metrics.csv`
