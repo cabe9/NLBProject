@@ -1,3 +1,3 @@
 model,model_type,co-bps,vel R2,psth R2,params
-baseline,ridge_direct,-0.0334800021487025,0.07614880872615087,,"{""ridge_alpha"": 0.1}"
-improved,ridge_direct,-0.0334800021487025,0.07614880872615087,,"{""ridge_alpha"": 0.1}"
+baseline,ridge_direct,0.0017112555893671058,0.07690439066418892,,"{""log_offset"": 0.001, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"
+improved,ridge_direct,0.0017112555893671058,0.07690439066418892,,"{""log_offset"": 0.001, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"

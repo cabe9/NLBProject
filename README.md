@@ -6,7 +6,7 @@ This repository trains lightweight linear and latent models on the Neural Latent
 
 It uses the official `nlb_tools` tensor-building and evaluation path, scores models with `co-bps` plus `vel R2` / `psth R2`, and writes tracked metrics tables and comparison figures under `results/`.
 
-The strongest validated result in the repo is a **lagged PCA latent regression** model, which improves materially over the original static PCA baseline without changing the benchmark protocol.
+Under the repo's default `log_link` rate readout, two lagged models tie on `co-bps` (lagged reduced-rank regression at 0.028, lagged PCA at 0.027), with **lagged PCA winning decisively on `vel R2`** (0.36 vs 0.23). The reported "best validated model" is the lagged PCA row because it produces the more behaviourally-structured latent while matching RRR on co-smoothing.
 
 ## Project goal
 
@@ -14,9 +14,13 @@ The central modeling question was:
 
 > Does short-timescale neural history matter more than static latent dimensionality for `mc_maze` co-smoothing?
 
-The current evidence in this repo says yes.
+The current evidence in this repo says yes. Every lagged model beats every static model on `co-bps`, regardless of whether the latent structure is imposed by PCA, a supervised low-rank regression, or omitted entirely.
 
-Static PCA was weak. Static direct ridge was worse. Lagged direct ridge added temporal context but overfit the expanded feature space. A lagged reduced-rank regression control improved over raw lagged ridge but still stayed worse than lagged PCA on co-bps. Lagged PCA improved because it added short neural history and compressed that history before regressing to held-out neurons.
+Static PCA and static direct ridge both sit near zero co-bps. Adding short neural history moves every lagged model into positive co-bps territory. Among the lagged variants, PCA and supervised reduced-rank regression finish within 0.002 co-bps of each other; the distinction shows up on `vel R2`, where lagged PCA's bottleneck captures more behavioural structure.
+
+### A note on the scientific narrative
+
+An earlier version of this repo reported a much larger gap between lagged PCA and lagged direct ridge (0.049 vs -0.43 co-bps), and concluded that supervised reduced-rank regression failed to recover the PCA gain. Those numbers were produced under a Gaussian-ridge rate readout whose predictions were clipped to `[1e-9, 1e20]` before Poisson scoring; the `-0.43` figure was almost entirely a clip-floor artefact, not a model failure. After fixing the readout (see `src/nlb_project/models/output_head.py` and `results/benchmark_runs/output_head_comparison_3heads.json`), the gap between lagged direct ridge, RRR, and lagged PCA on co-bps compresses to ~0.01–0.02, and the remaining signal lives on `vel R2`. The pre-fix numbers are preserved in the three-head comparison artifact for reference.
 
 ## Benchmark and evaluation path
 
@@ -121,7 +125,9 @@ The metric values in those artifacts are regenerated from those tracked `metrics
 The checked-in comparison artifacts are generated from tracked benchmark `metrics.csv` files under `results/benchmark_runs/`.
 
 Headline result:
-- in the tracked comparison set, the selected lagged PCA model is the strongest `co-bps` result and also improves `vel R2` over the static baselines
+- every lagged model beats every static model on `co-bps`; the best static row (static direct ridge, 0.0017) is an order of magnitude below the worst lagged row (lagged PCA 5-bin, 0.0166)
+- among lagged models, RRR (selected) and lagged PCA (selected history) tie on `co-bps` (0.0283 vs 0.0266), but lagged PCA pulls ahead on `vel R2` (0.365 vs 0.232)
+- the selected-history lagged PCA row is reported as the headline validated model because it offers the best `co-bps` / `vel R2` balance on this benchmark slice
 
 Quick visual:
 
@@ -136,9 +142,9 @@ Skimmable table:
 
 Main takeaway:
 - temporal context mattered much more than static latent dimensionality alone
-- temporal context by itself was not enough; the lagged design needed latent compression
-- a supervised low-rank mapping helped less than the PCA bottleneck on this benchmark slice
-- the diagnostic panel shows why: lagged direct ridge improved `vel R2` but hurt `co-bps`, while lagged PCA improved both
+- on `co-bps` alone, supervised low-rank regression (RRR) is statistically indistinguishable from PCA compression once history is included
+- the useful discriminator between lagged models is `vel R2`, not `co-bps`: lagged PCA's unsupervised bottleneck captures more behaviourally-aligned structure than either raw lagged ridge or supervised RRR
+- all six rows are scored under the `log_link` readout; the three-head ablation in `results/benchmark_runs/output_head_comparison_3heads.json` shows how much of the old narrative was driven by the legacy clipped-Gaussian readout
 
 ## Why this matters for neural decoding
 
@@ -231,7 +237,7 @@ Current limitations:
 - the best model is still linear and not yet a dynamical latent model
 
 Recent control result:
-- lagged reduced-rank regression was tested on the same feature pipeline and improved over raw lagged ridge, but it still did not beat lagged PCA on `co-bps`
+- lagged reduced-rank regression was tested on the same feature pipeline and now finishes within 0.002 co-bps of lagged PCA (0.0283 vs 0.0266). On `vel R2` lagged PCA still pulls ahead (0.365 vs 0.232), suggesting the remaining gap is about latent structure rather than rank.
 
 Most justified next step:
 - add a simple linear dynamical latent model or factor-analysis-style temporal latent model on the same benchmark path

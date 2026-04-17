@@ -47,7 +47,7 @@ DEFAULT_COMPARISON_SPECS = [
         label="lagged reduced-rank regression (selected)",
         metrics_path="results/benchmark_runs/lagged_rrr_sweep/metrics.csv",
         model_row="improved",
-        note="A supervised low-rank mapping stayed worse than lagged PCA on co-bps.",
+        note="Supervised low-rank control; ties lagged PCA on co-bps, trails on vel R2.",
     ),
     ComparisonSpec(
         label="lagged PCA latent regression (5 bins)",
@@ -171,9 +171,12 @@ def write_comparison_md(rows: list[dict[str, Any]], out_path: str | Path) -> Non
         [
             "",
             "Takeaway:",
-            "- The winning change was adding short neural history and compressing that history before regression.",
-            "- Temporal context mattered more than static latent dimensionality alone.",
-            "- A supervised reduced-rank mapping did not recover the same co-smoothing gain as lagged PCA.",
+            "- Short neural history is what separates the competitive models from the static ones; every lagged row beats every static row on co-bps.",
+            "- Co-bps alone does not pick a single winner among lagged models: RRR and lagged PCA finish within 0.002 co-bps of each other, but lagged PCA pulls ahead on vel R2 (0.36 vs 0.23), indicating a more behaviourally structured latent.",
+            "- Static latent dimensionality alone is not enough: static PCA sits near zero co-bps regardless of rank.",
+            "",
+            "Note on numbers:",
+            "- All rows are generated under the default `log_link` rate readout. The legacy `linear` readout clipped Gaussian-ridge outputs at 1e-9 before Poisson scoring, which produced artefacts like `lagged direct ridge = -0.43 co-bps` that were pure readout pathology rather than model failure. See `results/benchmark_runs/output_head_comparison_3heads.json` for the three-head ablation (linear / log_link / poisson_glm).",
         ]
     )
     Path(out_path).write_text("\n".join(lines), encoding="utf-8")
@@ -215,9 +218,9 @@ def write_experiment_log_md(
             "## Interpretation",
             "",
             "- The original static PCA model was weak because it ignored short-timescale neural history.",
-            "- Direct lagged ridge showed that temporal context alone is not enough; the lagged design needs compression.",
-            "- Lagged PCA latent regression was the first model family that improved co-smoothing substantially while remaining simple and interpretable.",
-            "- Lagged reduced-rank regression did not beat lagged PCA, which suggests the PCA bottleneck was already a better fit than this simple supervised low-rank mapping.",
+            "- Every lagged model beats every static model on co-bps, confirming temporal context is the dominant factor on this benchmark slice.",
+            "- Under the corrected `log_link` readout, supervised reduced-rank regression is statistically indistinguishable from unsupervised PCA compression on co-bps; the distinguishing signal lives on `vel R2`, where lagged PCA's bottleneck produces a latent that is more behaviourally aligned.",
+            "- The earlier reported gap between lagged direct ridge and the other lagged models (co-bps = -0.43) was almost entirely a clip-floor artefact of the legacy Gaussian-ridge-on-counts readout; see `results/benchmark_runs/output_head_comparison_3heads.json` for the three-head ablation.",
         ]
     )
     Path(out_path).write_text("\n".join(lines), encoding="utf-8")
