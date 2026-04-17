@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import numpy as np
-from sklearn.linear_model import Ridge
 
+from .output_head import OutputHead, fit_predict_rate_head
 from .temporal_features import _flatten_trial_time, apply_input_transform, build_history_features
 
 
@@ -14,8 +14,14 @@ def predict_lagged_ridge_direct(
     ridge_alpha: float,
     history_bins: int,
     input_transform: str = "sqrt",
+    output_head: OutputHead = "log_link",
+    log_offset: float = 1e-3,
 ) -> dict[str, np.ndarray]:
-    """Predict held-out rates from lagged held-in features using multi-target ridge."""
+    """Predict held-out rates from lagged held-in features with a rate readout.
+
+    Defaults to a log-link ridge readout so rate predictions are strictly
+    positive. Pass ``output_head="linear"`` for the legacy Gaussian readout.
+    """
     train_rates_heldin = np.asarray(train_rates_heldin, dtype=np.float32)
     train_rates_heldout = np.asarray(train_rates_heldout, dtype=np.float32)
     eval_rates_heldin = np.asarray(eval_rates_heldin, dtype=np.float32)
@@ -32,15 +38,18 @@ def predict_lagged_ridge_direct(
     train_x, eval_x = apply_input_transform(train_x, eval_x, transform=input_transform)
     train_y = _flatten_trial_time(train_rates_heldout)
 
-    ridge = Ridge(alpha=float(ridge_alpha), random_state=0)
-    ridge.fit(train_x, train_y)
-
-    train_pred = ridge.predict(train_x).reshape(n_train, tlen, n_ho)
-    eval_pred = ridge.predict(eval_x).reshape(n_eval, tlen, n_ho)
+    train_pred_2d, eval_pred_2d = fit_predict_rate_head(
+        train_x,
+        train_y,
+        eval_x,
+        ridge_alpha=ridge_alpha,
+        head=output_head,
+        log_offset=log_offset,
+    )
 
     return {
         "train_rates_heldin": np.clip(train_rates_heldin, 1e-9, 1e20),
-        "train_rates_heldout": np.clip(train_pred, 1e-9, 1e20),
+        "train_rates_heldout": train_pred_2d.reshape(n_train, tlen, n_ho),
         "eval_rates_heldin": np.clip(eval_rates_heldin, 1e-9, 1e20),
-        "eval_rates_heldout": np.clip(eval_pred, 1e-9, 1e20),
+        "eval_rates_heldout": eval_pred_2d.reshape(n_eval, tlen, n_ho),
     }

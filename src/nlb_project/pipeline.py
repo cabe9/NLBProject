@@ -40,6 +40,27 @@ def set_seeds(seed: int) -> None:
     np.random.seed(seed)
 
 
+_DEFAULT_OUTPUT_HEAD = "log_link"
+_DEFAULT_RATE_LOG_OFFSET = 1e-3
+
+
+def _rate_head_params(section: dict[str, Any]) -> dict[str, Any]:
+    """Pull rate-readout knobs from a baseline/improvement config section.
+
+    Supports two YAML styles so existing configs keep working:
+
+    * explicit keys in the section itself (``output_head``, ``log_offset``)
+    * omission, in which case the repo-wide defaults kick in
+
+    The returned dict is merged into model-parameter dicts so every model
+    fit gets a consistent rate-readout spec.
+    """
+    return {
+        "output_head": str(section.get("output_head", _DEFAULT_OUTPUT_HEAD)),
+        "log_offset": float(section.get("log_offset", _DEFAULT_RATE_LOG_OFFSET)),
+    }
+
+
 def _dataset_key(dataset_name: str, bin_size_ms: int) -> str:
     suf = "" if bin_size_ms == 5 else f"_{bin_size_ms}"
     return f"{dataset_name}{suf}"
@@ -103,6 +124,8 @@ def _run_single_eval(
             eval_dict["eval_spikes_heldin"],
             n_components=params["n_components"],
             ridge_alpha=params["ridge_alpha"],
+            output_head=params.get("output_head", "log_link"),
+            log_offset=params.get("log_offset", 1e-3),
         )
     elif cfg.model_type == "ridge_direct":
         preds = predict_ridge_direct(
@@ -110,6 +133,8 @@ def _run_single_eval(
             train_dict["train_spikes_heldout"],
             eval_dict["eval_spikes_heldin"],
             ridge_alpha=params["ridge_alpha"],
+            output_head=params.get("output_head", "log_link"),
+            log_offset=params.get("log_offset", 1e-3),
         )
     elif cfg.model_type == "lagged_ridge_direct":
         preds = predict_lagged_ridge_direct(
@@ -119,6 +144,8 @@ def _run_single_eval(
             ridge_alpha=params["ridge_alpha"],
             history_bins=params["history_bins"],
             input_transform=params["input_transform"],
+            output_head=params.get("output_head", "log_link"),
+            log_offset=params.get("log_offset", 1e-3),
         )
     elif cfg.model_type == "lagged_pca_latent_regression":
         preds = predict_lagged_pca_latent_regression(
@@ -129,6 +156,8 @@ def _run_single_eval(
             ridge_alpha=params["ridge_alpha"],
             history_bins=params["history_bins"],
             input_transform=params["input_transform"],
+            output_head=params.get("output_head", "log_link"),
+            log_offset=params.get("log_offset", 1e-3),
         )
     elif cfg.model_type == "lagged_reduced_rank_regression":
         preds = predict_lagged_reduced_rank_regression(
@@ -139,6 +168,8 @@ def _run_single_eval(
             ridge_alpha=params["ridge_alpha"],
             history_bins=params["history_bins"],
             input_transform=params["input_transform"],
+            output_head=params.get("output_head", "log_link"),
+            log_offset=params.get("log_offset", 1e-3),
         )
     elif cfg.model_type == "lds_pca_latent_regression":
         preds = predict_lds_pca_latent_regression(
@@ -149,6 +180,8 @@ def _run_single_eval(
             ridge_alpha=params["ridge_alpha"],
             input_transform=params["input_transform"],
             obs_noise_scale=params["obs_noise_scale"],
+            output_head=params.get("output_head", "log_link"),
+            log_offset=params.get("log_offset", 1e-3),
         )
     else:
         raise ValueError(
@@ -229,11 +262,17 @@ def _select_best_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[
     ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1, 1.0])
     folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
 
+    head_params = _rate_head_params(imp if imp else cfg.baseline)
+
     best_score = -np.inf
     best_params: dict[str, Any] | None = None
     for n_components, ridge_alpha in itertools.product(n_components_grid, ridge_alpha_grid):
         fold_scores = []
-        params = {"n_components": int(n_components), "ridge_alpha": float(ridge_alpha)}
+        params = {
+            "n_components": int(n_components),
+            "ridge_alpha": float(ridge_alpha),
+            **head_params,
+        }
         for train_mask, eval_mask in folds:
             _, metrics = _run_single_eval(
                 dataset,
@@ -272,11 +311,13 @@ def _select_best_ridge_direct_params(dataset: NWBDataset, cfg: ExperimentConfig)
     ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1])
     folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
 
+    head_params = _rate_head_params(imp if imp else cfg.baseline)
+
     best_score = -np.inf
     best_params: dict[str, Any] | None = None
     for ridge_alpha in ridge_alpha_grid:
         fold_scores = []
-        params = {"ridge_alpha": float(ridge_alpha)}
+        params = {"ridge_alpha": float(ridge_alpha), **head_params}
         for train_mask, eval_mask in folds:
             _, metrics = _run_single_eval(
                 dataset,
@@ -313,6 +354,7 @@ def _select_best_lagged_ridge_params(dataset: NWBDataset, cfg: ExperimentConfig)
     ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1])
     history_bins_grid = imp.get("history_bins_grid", [3, 5, 9])
     input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt"))
+    head_params = _rate_head_params(imp if imp else cfg.baseline)
     folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
 
     best_score = -np.inf
@@ -323,6 +365,7 @@ def _select_best_lagged_ridge_params(dataset: NWBDataset, cfg: ExperimentConfig)
             "history_bins": int(history_bins),
             "ridge_alpha": float(ridge_alpha),
             "input_transform": input_transform,
+            **head_params,
         }
         for train_mask, eval_mask in folds:
             _, metrics = _run_single_eval(
@@ -365,6 +408,7 @@ def _select_best_lagged_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -
     ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1, 1.0])
     history_bins_grid = imp.get("history_bins_grid", [3, 5, 9])
     input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
+    head_params = _rate_head_params(imp if imp else cfg.baseline)
     folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
 
     best_score = -np.inf
@@ -378,6 +422,7 @@ def _select_best_lagged_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -
             "n_components": int(n_components),
             "ridge_alpha": float(ridge_alpha),
             "input_transform": input_transform,
+            **head_params,
         }
         for train_mask, eval_mask in folds:
             _, metrics = _run_single_eval(
@@ -425,6 +470,7 @@ def _select_best_lagged_rrr_params(dataset: NWBDataset, cfg: ExperimentConfig) -
     rank_grid = imp.get("rank_grid", [5, 10, 20, 40])
     ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1, 1.0])
     input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
+    head_params = _rate_head_params(imp if imp else cfg.baseline)
     folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
 
     best_score = -np.inf
@@ -438,6 +484,7 @@ def _select_best_lagged_rrr_params(dataset: NWBDataset, cfg: ExperimentConfig) -
             "rank": int(rank),
             "ridge_alpha": float(ridge_alpha),
             "input_transform": input_transform,
+            **head_params,
         }
         for train_mask, eval_mask in folds:
             _, metrics = _run_single_eval(
@@ -485,6 +532,7 @@ def _select_best_lds_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -> d
     ridge_alpha = float(imp.get("ridge_alpha", cfg.baseline.get("ridge_alpha", 0.1)))
     input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
     obs_noise_scale = float(imp.get("obs_noise_scale", cfg.baseline.get("obs_noise_scale", 0.1)))
+    head_params = _rate_head_params(imp if imp else cfg.baseline)
     folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
 
     best_score = -np.inf
@@ -496,6 +544,7 @@ def _select_best_lds_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -> d
             "ridge_alpha": ridge_alpha,
             "input_transform": input_transform,
             "obs_noise_scale": obs_noise_scale,
+            **head_params,
         }
         for train_mask, eval_mask in folds:
             _, metrics = _run_single_eval(
@@ -557,16 +606,21 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
         reference_params = {
             "n_components": int(cfg.baseline.get("n_components", 10)),
             "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
+            **_rate_head_params(cfg.baseline),
         }
         selected_params = _select_best_pca_params(dataset, cfg)
     elif cfg.model_type == "ridge_direct":
-        reference_params = {"ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1))}
+        reference_params = {
+            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
+            **_rate_head_params(cfg.baseline),
+        }
         selected_params = _select_best_ridge_direct_params(dataset, cfg)
     elif cfg.model_type == "lagged_ridge_direct":
         reference_params = {
             "history_bins": int(cfg.baseline.get("history_bins", 5)),
             "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
             "input_transform": cfg.baseline.get("input_transform", "sqrt"),
+            **_rate_head_params(cfg.baseline),
         }
         selected_params = _select_best_lagged_ridge_params(dataset, cfg)
     elif cfg.model_type == "lagged_pca_latent_regression":
@@ -575,6 +629,7 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
             "n_components": int(cfg.baseline.get("n_components", 20)),
             "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
             "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
+            **_rate_head_params(cfg.baseline),
         }
         selected_params = _select_best_lagged_pca_params(dataset, cfg)
     elif cfg.model_type == "lagged_reduced_rank_regression":
@@ -583,6 +638,7 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
             "rank": int(cfg.baseline.get("rank", 10)),
             "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
             "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
+            **_rate_head_params(cfg.baseline),
         }
         selected_params = _select_best_lagged_rrr_params(dataset, cfg)
     elif cfg.model_type == "lds_pca_latent_regression":
@@ -591,6 +647,7 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
             "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
             "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
             "obs_noise_scale": float(cfg.baseline.get("obs_noise_scale", 0.1)),
+            **_rate_head_params(cfg.baseline),
         }
         selected_params = _select_best_lds_pca_params(dataset, cfg)
     else:

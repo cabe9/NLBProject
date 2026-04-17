@@ -4,48 +4,10 @@ import logging
 
 import numpy as np
 
+from .output_head import OutputHead, fit_reduced_rank_log_rate
 from .temporal_features import _flatten_trial_time, apply_input_transform, build_history_features
 
 logger = logging.getLogger(__name__)
-
-
-def _fit_reduced_rank_weights(
-    train_x: np.ndarray,
-    train_y: np.ndarray,
-    *,
-    rank: int,
-    ridge_alpha: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Fit ridge-regularized reduced-rank regression with train-only centering.
-
-    The rank constraint is applied to the fitted response subspace:
-    B_rrr = B_ridge V_r V_r^T
-    where V_r are the top right singular vectors of X B_ridge.
-    """
-    x_mean = train_x.mean(axis=0, keepdims=True)
-    y_mean = train_y.mean(axis=0, keepdims=True)
-    xc = train_x - x_mean
-    yc = train_y - y_mean
-
-    xtx = xc.T @ xc
-    reg = float(ridge_alpha) * np.eye(xtx.shape[0], dtype=np.float32)
-    b_ridge = np.linalg.solve(xtx + reg, xc.T @ yc)
-
-    y_hat = xc @ b_ridge
-    _, _, vt = np.linalg.svd(y_hat, full_matrices=False)
-    max_rank = min(vt.shape[0], yc.shape[1])
-    rank_eff = max(1, min(int(rank), max_rank))
-    if rank_eff != int(rank):
-        logger.warning(
-            "Requested rank=%s exceeds allowed maximum=%s. Using rank=%s.",
-            rank,
-            max_rank,
-            rank_eff,
-        )
-    v_r = vt[:rank_eff].T
-    b_rrr = b_ridge @ v_r @ v_r.T
-    intercept = y_mean - x_mean @ b_rrr
-    return b_rrr.astype(np.float32), intercept.astype(np.float32)
 
 
 def predict_lagged_reduced_rank_regression(
@@ -57,8 +19,17 @@ def predict_lagged_reduced_rank_regression(
     ridge_alpha: float,
     history_bins: int,
     input_transform: str = "sqrt_zscore",
+    output_head: OutputHead = "log_link",
+    log_offset: float = 1e-3,
 ) -> dict[str, np.ndarray]:
-    """Predict held-out rates with lagged reduced-rank regression."""
+    """Predict held-out rates with lagged reduced-rank regression.
+
+    Under ``output_head="log_link"`` (default) the rank constraint is applied
+    in log-rate space: the ridge targets are ``log(count + log_offset)`` and
+    the rank-``r`` coefficient is projected onto the top response subspace
+    before exponentiation. This keeps the low-rank structure of the original
+    model while producing strictly positive rate predictions.
+    """
     train_rates_heldin = np.asarray(train_rates_heldin, dtype=np.float32)
     train_rates_heldout = np.asarray(train_rates_heldout, dtype=np.float32)
     eval_rates_heldin = np.asarray(eval_rates_heldin, dtype=np.float32)
@@ -75,19 +46,19 @@ def predict_lagged_reduced_rank_regression(
     train_x, eval_x = apply_input_transform(train_x, eval_x, transform=input_transform)
     train_y = _flatten_trial_time(train_rates_heldout)
 
-    weights, intercept = _fit_reduced_rank_weights(
+    train_pred_2d, eval_pred_2d = fit_reduced_rank_log_rate(
         train_x,
         train_y,
+        eval_x,
         rank=rank,
         ridge_alpha=ridge_alpha,
+        head=output_head,
+        log_offset=log_offset,
     )
-
-    train_pred = (train_x @ weights + intercept).reshape(n_train, tlen, n_ho)
-    eval_pred = (eval_x @ weights + intercept).reshape(n_eval, tlen, n_ho)
 
     return {
         "train_rates_heldin": np.clip(train_rates_heldin, 1e-9, 1e20),
-        "train_rates_heldout": np.clip(train_pred, 1e-9, 1e20),
+        "train_rates_heldout": train_pred_2d.reshape(n_train, tlen, n_ho),
         "eval_rates_heldin": np.clip(eval_rates_heldin, 1e-9, 1e20),
-        "eval_rates_heldout": np.clip(eval_pred, 1e-9, 1e20),
+        "eval_rates_heldout": eval_pred_2d.reshape(n_eval, tlen, n_ho),
     }
