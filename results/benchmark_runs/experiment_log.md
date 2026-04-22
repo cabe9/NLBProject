@@ -8,7 +8,7 @@ This summary is generated from committed `metrics.csv` artifacts.
 |---|---:|---:|---|
 | static PCA latent regression | -0.0068 | 0.0756 | Static latent baseline; no temporal context. |
 | static direct ridge | 0.0017 | 0.0769 | Direct one-bin regression is not competitive. |
-| lagged direct ridge (5 bins) | 0.0215 | 0.1986 | Temporal history alone overfit without a latent bottleneck. |
+| lagged direct ridge (5 bins) | 0.0215 | 0.1986 | Lagged ridge matches the matched-history latent models on co-bps but trails them on vel R2; the latent bottleneck mostly helps behavioural decoding, not likelihood. |
 | lagged reduced-rank regression (selected) | 0.0283 | 0.2316 | Supervised low-rank control; ties lagged PCA on co-bps, trails on vel R2. |
 | lagged PCA latent regression (5 bins) | 0.0166 | 0.2400 | Temporal context plus train-only conditioning gave the first real gain. |
 | lagged PCA latent regression (selected history) | 0.0266 | 0.3648 | Best validated model in the repo. |

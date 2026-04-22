@@ -41,7 +41,11 @@ DEFAULT_COMPARISON_SPECS = [
         label="lagged direct ridge (5 bins)",
         metrics_path="results/benchmark_runs/lagged_ridge_single/metrics.csv",
         model_row="baseline",
-        note="Temporal history alone overfit without a latent bottleneck.",
+        note=(
+            "Lagged ridge matches the matched-history latent models on co-bps "
+            "but trails them on vel R2; the latent bottleneck mostly helps "
+            "behavioural decoding, not likelihood."
+        ),
     ),
     ComparisonSpec(
         label="lagged reduced-rank regression (selected)",

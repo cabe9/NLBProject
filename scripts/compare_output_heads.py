@@ -116,8 +116,12 @@ ROWS: list[Row] = [
 ]
 
 
-def _build_cfg(row: Row, data_path: str) -> ExperimentConfig:
-    """Build a minimal ExperimentConfig matching the original benchmark setup."""
+def _build_cfg(row: Row, data_path: str, log_offset: float) -> ExperimentConfig:
+    """Build a minimal ExperimentConfig matching the original benchmark setup.
+
+    ``log_offset`` is mirrored from the CLI flag so the field on ``cfg`` and
+    the value injected into the per-head params dict can never disagree.
+    """
     return ExperimentConfig(
         dataset_name="mc_maze",
         data_path=data_path,
@@ -126,7 +130,7 @@ def _build_cfg(row: Row, data_path: str) -> ExperimentConfig:
         train_split="train",
         eval_split="val",
         include_psth=False,
-        log_offset=0.0001,
+        log_offset=log_offset,
         seed=0,
         skip_fields=[
             "hand_pos",
@@ -151,7 +155,7 @@ def _run_with_head(
     row: Row,
     head: str,
     log_offset: float,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     params = dict(row.params)
     params["output_head"] = head
     params["log_offset"] = log_offset
@@ -169,6 +173,7 @@ def _run_with_head(
         "co-bps": float(metrics.get("co-bps", float("nan"))),
         "vel R2": float(metrics.get("vel R2", float("nan"))),
         "wall_s": time.perf_counter() - t0,
+        "params": params,
     }
 
 
@@ -218,7 +223,7 @@ def main() -> None:
 
     results: list[dict[str, Any]] = []
     for row in ROWS:
-        cfg = _build_cfg(row, data_path=args.data_path)
+        cfg = _build_cfg(row, data_path=args.data_path, log_offset=args.log_offset)
         linear = _run_with_head(dataset, cfg, row, "linear", args.log_offset)
         loglink = _run_with_head(dataset, cfg, row, "log_link", args.log_offset)
         poisson = _run_with_head(dataset, cfg, row, "poisson_glm", args.log_offset)
@@ -226,7 +231,18 @@ def main() -> None:
             {
                 "label": row.label,
                 "model_type": row.model_type,
-                "params": row.params,
+                # Shared model knobs (same across the three heads).
+                "params": dict(row.params),
+                # log_offset is shared across heads in this script and is the
+                # only score-affecting param not encoded in the column suffix.
+                "log_offset": args.log_offset,
+                # Full per-head params snapshot, including ``output_head`` and
+                # ``log_offset`` actually passed into the model. Lets a future
+                # reader reproduce any single column without reading this
+                # script's CLI defaults.
+                "linear_params": linear["params"],
+                "log_link_params": loglink["params"],
+                "poisson_glm_params": poisson["params"],
                 "old_cobps": row.old_cobps,
                 "old_vel_r2": row.old_vel_r2,
                 "old_source": row.old_source,
