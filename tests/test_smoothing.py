@@ -1,9 +1,12 @@
+"""Shape and finiteness tests for the Gaussian-smoothing + Poisson-GLM baseline."""
+
 import numpy as np
 
 from nlb_project.smoothing import SmoothingParams, predict_rates
 
 
 def test_predict_rates_shapes_and_finite():
+    """Smoothing predictions have the expected shapes and are all finite."""
     rng = np.random.default_rng(0)
     train_hi = rng.poisson(0.4, (5, 30, 4)).astype(float)
     train_ho = rng.poisson(0.4, (5, 30, 2)).astype(float)

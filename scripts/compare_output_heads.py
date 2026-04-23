@@ -30,6 +30,7 @@ import numpy as np
 # Keep imports after argparse so --help works without loading heavy deps.
 from nlb_project.config import ExperimentConfig
 from nlb_project.data_contract import resolve_data_path
+from nlb_project.model_registry import get_spec
 from nlb_project.pipeline import _run_single_eval  # type: ignore[import]
 
 logger = logging.getLogger("compare_output_heads")
@@ -160,9 +161,11 @@ def _run_with_head(
     params["output_head"] = head
     params["log_offset"] = log_offset
     t0 = time.perf_counter()
+    spec = get_spec(cfg.model_type)
     _, metrics = _run_single_eval(
         dataset,
         cfg,
+        spec,
         cfg.train_split,
         cfg.eval_split,
         params,

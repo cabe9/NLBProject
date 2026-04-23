@@ -1,8 +1,17 @@
+"""Smoke test against the official ``nlb_tools`` evaluator.
+
+Wiring-only check: feed synthetic positive rate tensors through
+``nlb_tools.evaluation.evaluate`` and confirm ``co-bps`` and ``vel R2``
+come out finite. Guards that we haven't drifted from the evaluator's
+expected tensor keys / shapes. Skipped when ``nlb_tools`` isn't importable.
+"""
+
 import numpy as np
 import pytest
 
 
 def test_nlb_evaluate_smoke():
+    """Synthetic positive rates score finite on the official NLB evaluator."""
     nlb_eval = pytest.importorskip("nlb_tools.evaluation")
 
     rng = np.random.default_rng(0)

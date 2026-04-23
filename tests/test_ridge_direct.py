@@ -1,15 +1,23 @@
+"""Shape and param-sensitivity tests for the direct-ridge baseline.
+
+Guards that the static Gaussian-ridge readout on raw held-in rates returns
+the expected tensor shapes and that changing ``ridge_alpha`` actually
+changes the output (i.e. the sweep is doing real work).
+"""
+
 import numpy as np
 
-from nlb_project.models.ridge_direct import predict_ridge_direct
+from nlb_project.models.ridge_direct import fit_predict_ridge_direct
 
 
 def test_ridge_direct_shapes():
+    """Direct ridge returns train/eval tensors matching the held-out shape."""
     rng = np.random.default_rng(11)
     train_hi = rng.poisson(0.5, (7, 20, 10)).astype(float)
     train_ho = rng.poisson(0.5, (7, 20, 4)).astype(float)
     eval_hi = rng.poisson(0.5, (3, 20, 10)).astype(float)
 
-    out = predict_ridge_direct(
+    out = fit_predict_ridge_direct(
         train_hi,
         train_ho,
         eval_hi,
@@ -23,18 +31,19 @@ def test_ridge_direct_shapes():
 
 
 def test_ridge_direct_params_change_output():
+    """Distinct ``ridge_alpha`` values produce distinct predictions."""
     rng = np.random.default_rng(29)
     train_hi = rng.poisson(0.7, (8, 30, 12)).astype(float)
     train_ho = rng.poisson(0.7, (8, 30, 5)).astype(float)
     eval_hi = rng.poisson(0.7, (4, 30, 12)).astype(float)
 
-    out_small_alpha = predict_ridge_direct(
+    out_small_alpha = fit_predict_ridge_direct(
         train_hi,
         train_ho,
         eval_hi,
         ridge_alpha=1e-3,
     )
-    out_large_alpha = predict_ridge_direct(
+    out_large_alpha = fit_predict_ridge_direct(
         train_hi,
         train_ho,
         eval_hi,

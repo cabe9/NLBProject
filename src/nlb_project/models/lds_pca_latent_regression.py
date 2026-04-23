@@ -84,7 +84,7 @@ def _smooth_latents(
     return out
 
 
-def predict_lds_pca_latent_regression(
+def fit_predict_lds_pca_latent_regression(
     train_rates_heldin: np.ndarray,
     train_rates_heldout: np.ndarray,
     eval_rates_heldin: np.ndarray,

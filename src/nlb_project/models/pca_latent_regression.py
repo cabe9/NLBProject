@@ -14,7 +14,7 @@ def _flatten_trial_time(arr: np.ndarray) -> np.ndarray:
     return arr.reshape(-1, arr.shape[2])
 
 
-def predict_pca_latent_regression(
+def fit_predict_pca_latent_regression(
     train_rates_heldin: np.ndarray,
     train_rates_heldout: np.ndarray,
     eval_rates_heldin: np.ndarray,

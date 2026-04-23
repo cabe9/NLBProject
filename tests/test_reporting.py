@@ -1,3 +1,10 @@
+"""Tests for the portfolio-artifact builder.
+
+Given a set of ``metrics.csv`` fixtures under a tmp tree, the comparison
+builder must pull in the requested rows, annotate them with role labels,
+and emit markdown / SVG artifacts with the expected headline content.
+"""
+
 from __future__ import annotations
 
 import csv
@@ -24,6 +31,7 @@ def _write_metrics(path: Path, rows: list[dict[str, str]]) -> None:
 
 
 def test_build_comparison_rows_and_outputs(tmp_path: Path) -> None:
+    """Rows are assembled with role labels and MD/SVG artifacts are written."""
     _write_metrics(
         tmp_path / "results/benchmark_runs/static_pca/metrics.csv",
         [

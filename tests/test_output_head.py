@@ -11,22 +11,22 @@ import numpy as np
 import pytest
 
 from nlb_project.models.lagged_pca_latent_regression import (
-    predict_lagged_pca_latent_regression,
+    fit_predict_lagged_pca_latent_regression,
 )
 from nlb_project.models.lagged_reduced_rank_regression import (
-    predict_lagged_reduced_rank_regression,
+    fit_predict_lagged_reduced_rank_regression,
 )
-from nlb_project.models.lagged_ridge_direct import predict_lagged_ridge_direct
+from nlb_project.models.lagged_ridge_direct import fit_predict_lagged_ridge_direct
 from nlb_project.models.lds_pca_latent_regression import (
-    predict_lds_pca_latent_regression,
+    fit_predict_lds_pca_latent_regression,
 )
 from nlb_project.models.output_head import (
     fit_predict_rate_head,
     fit_reduced_rank_log_rate,
     validate_output_head,
 )
-from nlb_project.models.pca_latent_regression import predict_pca_latent_regression
-from nlb_project.models.ridge_direct import predict_ridge_direct
+from nlb_project.models.pca_latent_regression import fit_predict_pca_latent_regression
+from nlb_project.models.ridge_direct import fit_predict_ridge_direct
 
 
 def _poisson_tensors(
@@ -40,19 +40,23 @@ def _poisson_tensors(
 
 
 def test_validate_output_head_rejects_unknown():
+    """Unknown head strings raise ``ValueError`` at validation time."""
     with pytest.raises(ValueError):
         validate_output_head("not_a_real_head")
 
 
 def test_validate_output_head_accepts_poisson_glm():
+    """The Poisson-GLM head is a recognized output head."""
     assert validate_output_head("poisson_glm") == "poisson_glm"
 
 
 def test_validate_output_head_normalises_case():
+    """Head strings are lowercased so YAML casing doesn't matter."""
     assert validate_output_head("Log_Link") == "log_link"
 
 
 def test_log_link_predictions_are_strictly_positive():
+    """Log-link head never emits a zero/negative rate, even on sparse counts."""
     rng = np.random.default_rng(0)
     x_train = rng.standard_normal((200, 6)).astype(np.float32)
     x_eval = rng.standard_normal((80, 6)).astype(np.float32)
@@ -71,6 +75,7 @@ def test_log_link_predictions_are_strictly_positive():
 
 
 def test_linear_head_reproduces_legacy_behaviour_signature():
+    """The legacy linear head returns the expected shapes and respects the clip floor."""
     rng = np.random.default_rng(1)
     x_train = rng.standard_normal((100, 5)).astype(np.float32)
     x_eval = rng.standard_normal((40, 5)).astype(np.float32)
@@ -87,6 +92,7 @@ def test_linear_head_reproduces_legacy_behaviour_signature():
 
 
 def test_log_link_and_linear_heads_disagree_on_sparse_counts():
+    """Log-link and linear heads produce materially different rates on sparse data."""
     rng = np.random.default_rng(2)
     x_train = rng.standard_normal((150, 4)).astype(np.float32)
     x_eval = rng.standard_normal((50, 4)).astype(np.float32)
@@ -125,14 +131,14 @@ def test_log_link_mean_prediction_tracks_mean_rate():
 @pytest.mark.parametrize(
     "predict_fn,kwargs",
     [
-        (predict_ridge_direct, {"ridge_alpha": 0.1}),
-        (predict_pca_latent_regression, {"n_components": 4, "ridge_alpha": 0.1}),
+        (fit_predict_ridge_direct, {"ridge_alpha": 0.1}),
+        (fit_predict_pca_latent_regression, {"n_components": 4, "ridge_alpha": 0.1}),
         (
-            predict_lagged_ridge_direct,
+            fit_predict_lagged_ridge_direct,
             {"ridge_alpha": 0.1, "history_bins": 3, "input_transform": "sqrt"},
         ),
         (
-            predict_lagged_pca_latent_regression,
+            fit_predict_lagged_pca_latent_regression,
             {
                 "n_components": 5,
                 "ridge_alpha": 0.1,
@@ -141,7 +147,7 @@ def test_log_link_mean_prediction_tracks_mean_rate():
             },
         ),
         (
-            predict_lagged_reduced_rank_regression,
+            fit_predict_lagged_reduced_rank_regression,
             {
                 "rank": 3,
                 "ridge_alpha": 0.1,
@@ -150,7 +156,7 @@ def test_log_link_mean_prediction_tracks_mean_rate():
             },
         ),
         (
-            predict_lds_pca_latent_regression,
+            fit_predict_lds_pca_latent_regression,
             {
                 "n_components": 4,
                 "ridge_alpha": 0.1,
@@ -161,6 +167,7 @@ def test_log_link_mean_prediction_tracks_mean_rate():
     ],
 )
 def test_models_default_to_log_link_and_predict_positive_rates(predict_fn, kwargs):
+    """Every model's default readout emits strictly positive rate predictions."""
     train_hi, train_ho, eval_hi = _poisson_tensors(seed=hash(predict_fn.__name__) & 0xFF)
     out = predict_fn(train_hi, train_ho, eval_hi, **kwargs)
     assert np.all(out["eval_rates_heldout"] > 0.0)
@@ -204,6 +211,7 @@ def test_log_link_avoids_clip_floor_that_legacy_linear_hits():
 
 
 def test_poisson_glm_head_predicts_strictly_positive_rates():
+    """The per-neuron Poisson GLM readout emits strictly positive rates."""
     rng = np.random.default_rng(42)
     x_train = rng.standard_normal((200, 5)).astype(np.float32)
     x_eval = rng.standard_normal((80, 5)).astype(np.float32)
@@ -239,6 +247,7 @@ def test_poisson_glm_mean_prediction_matches_mean_rate_without_smearing():
 
 
 def test_poisson_glm_reduced_rank_respects_rank_constraint():
+    """Low-rank Poisson-GLM RRR yields different predictions than full-rank."""
     rng = np.random.default_rng(9)
     x_train = rng.standard_normal((200, 8)).astype(np.float32)
     x_eval = rng.standard_normal((60, 8)).astype(np.float32)
@@ -258,14 +267,14 @@ def test_poisson_glm_reduced_rank_respects_rank_constraint():
 @pytest.mark.parametrize(
     "predict_fn,kwargs",
     [
-        (predict_ridge_direct, {"ridge_alpha": 0.1}),
-        (predict_pca_latent_regression, {"n_components": 4, "ridge_alpha": 0.1}),
+        (fit_predict_ridge_direct, {"ridge_alpha": 0.1}),
+        (fit_predict_pca_latent_regression, {"n_components": 4, "ridge_alpha": 0.1}),
         (
-            predict_lagged_ridge_direct,
+            fit_predict_lagged_ridge_direct,
             {"ridge_alpha": 0.1, "history_bins": 3, "input_transform": "sqrt"},
         ),
         (
-            predict_lagged_pca_latent_regression,
+            fit_predict_lagged_pca_latent_regression,
             {
                 "n_components": 5,
                 "ridge_alpha": 0.1,
@@ -274,7 +283,7 @@ def test_poisson_glm_reduced_rank_respects_rank_constraint():
             },
         ),
         (
-            predict_lagged_reduced_rank_regression,
+            fit_predict_lagged_reduced_rank_regression,
             {
                 "rank": 3,
                 "ridge_alpha": 0.1,
@@ -283,7 +292,7 @@ def test_poisson_glm_reduced_rank_respects_rank_constraint():
             },
         ),
         (
-            predict_lds_pca_latent_regression,
+            fit_predict_lds_pca_latent_regression,
             {
                 "n_components": 4,
                 "ridge_alpha": 0.1,
@@ -294,6 +303,7 @@ def test_poisson_glm_reduced_rank_respects_rank_constraint():
     ],
 )
 def test_models_support_poisson_glm_head_end_to_end(predict_fn, kwargs):
+    """Every model accepts ``output_head="poisson_glm"`` and emits positive rates."""
     train_hi, train_ho, eval_hi = _poisson_tensors(seed=hash(predict_fn.__name__) & 0xFF)
     out = predict_fn(train_hi, train_ho, eval_hi, output_head="poisson_glm", **kwargs)
     assert np.all(out["eval_rates_heldout"] > 0.0)
@@ -301,6 +311,7 @@ def test_models_support_poisson_glm_head_end_to_end(predict_fn, kwargs):
 
 
 def test_reduced_rank_log_link_respects_rank_constraint():
+    """Low-rank log-link RRR yields different predictions than full-rank."""
     rng = np.random.default_rng(5)
     x_train = rng.standard_normal((200, 8)).astype(np.float32)
     x_eval = rng.standard_normal((60, 8)).astype(np.float32)

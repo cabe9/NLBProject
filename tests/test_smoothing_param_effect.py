@@ -1,9 +1,14 @@
+"""Guards that the smoothing sweep axes (``kern_sd_ms``, ``alpha``) are
+effective: distinct parameter values must produce distinct rate predictions.
+"""
+
 import numpy as np
 
 from nlb_project.smoothing import SmoothingParams, predict_rates
 
 
 def test_predictions_change_with_different_params():
+    """Distinct smoothing params produce distinct eval rate predictions."""
     rng = np.random.default_rng(123)
     train_hi = rng.poisson(0.6, (6, 40, 5)).astype(float)
     train_ho = rng.poisson(0.6, (6, 40, 3)).astype(float)

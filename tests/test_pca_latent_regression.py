@@ -1,15 +1,24 @@
+"""Shape and param-sensitivity tests for static PCA latent regression.
+
+Covers the non-lagged baseline: given trial x time x neuron tensors, the
+predicted held-out tensors must match the input shapes, and distinct
+``n_components`` / ``ridge_alpha`` values must produce distinct predictions
+(a guard against a silent fallback making both configurations identical).
+"""
+
 import numpy as np
 
-from nlb_project.models.pca_latent_regression import predict_pca_latent_regression
+from nlb_project.models.pca_latent_regression import fit_predict_pca_latent_regression
 
 
 def test_pca_latent_regression_shapes():
+    """Static PCA latent regression returns the expected tensor shapes."""
     rng = np.random.default_rng(7)
     train_hi = rng.poisson(0.5, (6, 25, 12)).astype(float)
     train_ho = rng.poisson(0.5, (6, 25, 4)).astype(float)
     eval_hi = rng.poisson(0.5, (3, 25, 12)).astype(float)
 
-    out = predict_pca_latent_regression(
+    out = fit_predict_pca_latent_regression(
         train_hi,
         train_ho,
         eval_hi,
@@ -24,19 +33,20 @@ def test_pca_latent_regression_shapes():
 
 
 def test_pca_latent_regression_params_change_output():
+    """Distinct ``n_components`` / ``ridge_alpha`` yield distinct predictions."""
     rng = np.random.default_rng(19)
     train_hi = rng.poisson(0.6, (8, 30, 15)).astype(float)
     train_ho = rng.poisson(0.6, (8, 30, 5)).astype(float)
     eval_hi = rng.poisson(0.6, (4, 30, 15)).astype(float)
 
-    out_a = predict_pca_latent_regression(
+    out_a = fit_predict_pca_latent_regression(
         train_hi,
         train_ho,
         eval_hi,
         n_components=5,
         ridge_alpha=0.001,
     )
-    out_b = predict_pca_latent_regression(
+    out_b = fit_predict_pca_latent_regression(
         train_hi,
         train_ho,
         eval_hi,

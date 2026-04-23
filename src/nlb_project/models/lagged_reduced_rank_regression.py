@@ -10,7 +10,7 @@ from .temporal_features import _flatten_trial_time, apply_input_transform, build
 logger = logging.getLogger(__name__)
 
 
-def predict_lagged_reduced_rank_regression(
+def fit_predict_lagged_reduced_rank_regression(
     train_rates_heldin: np.ndarray,
     train_rates_heldout: np.ndarray,
     eval_rates_heldin: np.ndarray,

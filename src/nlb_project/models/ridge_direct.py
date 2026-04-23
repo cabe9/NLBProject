@@ -9,7 +9,7 @@ def _flatten_trial_time(arr: np.ndarray) -> np.ndarray:
     return arr.reshape(-1, arr.shape[2])
 
 
-def predict_ridge_direct(
+def fit_predict_ridge_direct(
     train_rates_heldin: np.ndarray,
     train_rates_heldout: np.ndarray,
     eval_rates_heldin: np.ndarray,

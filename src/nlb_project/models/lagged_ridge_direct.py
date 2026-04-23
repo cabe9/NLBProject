@@ -6,7 +6,7 @@ from .output_head import OutputHead, fit_predict_rate_head
 from .temporal_features import _flatten_trial_time, apply_input_transform, build_history_features
 
 
-def predict_lagged_ridge_direct(
+def fit_predict_lagged_ridge_direct(
     train_rates_heldin: np.ndarray,
     train_rates_heldout: np.ndarray,
     eval_rates_heldin: np.ndarray,

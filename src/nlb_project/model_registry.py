@@ -23,12 +23,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .models import (
-    predict_lagged_pca_latent_regression,
-    predict_lagged_reduced_rank_regression,
-    predict_lagged_ridge_direct,
-    predict_lds_pca_latent_regression,
-    predict_pca_latent_regression,
-    predict_ridge_direct,
+    fit_predict_lagged_pca_latent_regression,
+    fit_predict_lagged_reduced_rank_regression,
+    fit_predict_lagged_ridge_direct,
+    fit_predict_lds_pca_latent_regression,
+    fit_predict_pca_latent_regression,
+    fit_predict_ridge_direct,
 )
 from .smoothing import SmoothingParams, predict_rates
 
@@ -101,7 +101,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
     ),
     "pca_latent_regression": ModelSpec(
         name="pca_latent_regression",
-        predict=predict_pca_latent_regression,
+        predict=fit_predict_pca_latent_regression,
         baseline_params=(("n_components", int), ("ridge_alpha", float)),
         sweep_axes=(
             SweepAxis("n_components_grid", "n_components", int),
@@ -110,13 +110,13 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
     ),
     "ridge_direct": ModelSpec(
         name="ridge_direct",
-        predict=predict_ridge_direct,
+        predict=fit_predict_ridge_direct,
         baseline_params=(("ridge_alpha", float),),
         sweep_axes=(SweepAxis("ridge_alpha_grid", "ridge_alpha", float),),
     ),
     "lagged_ridge_direct": ModelSpec(
         name="lagged_ridge_direct",
-        predict=predict_lagged_ridge_direct,
+        predict=fit_predict_lagged_ridge_direct,
         baseline_params=(
             ("history_bins", int),
             ("ridge_alpha", float),
@@ -130,7 +130,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
     ),
     "lagged_pca_latent_regression": ModelSpec(
         name="lagged_pca_latent_regression",
-        predict=predict_lagged_pca_latent_regression,
+        predict=fit_predict_lagged_pca_latent_regression,
         baseline_params=(
             ("history_bins", int),
             ("n_components", int),
@@ -146,7 +146,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
     ),
     "lagged_reduced_rank_regression": ModelSpec(
         name="lagged_reduced_rank_regression",
-        predict=predict_lagged_reduced_rank_regression,
+        predict=fit_predict_lagged_reduced_rank_regression,
         baseline_params=(
             ("history_bins", int),
             ("rank", int),
@@ -162,7 +162,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
     ),
     "lds_pca_latent_regression": ModelSpec(
         name="lds_pca_latent_regression",
-        predict=predict_lds_pca_latent_regression,
+        predict=fit_predict_lds_pca_latent_regression,
         baseline_params=(
             ("n_components", int),
             ("ridge_alpha", float),
