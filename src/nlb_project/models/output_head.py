@@ -48,17 +48,13 @@ _POISSON_ABSOLUTE_MAX_ITER: int = 10000
 def validate_output_head(head: str) -> str:
     head_lower = str(head).lower()
     if head_lower not in _VALID_HEADS:
-        raise ValueError(
-            f"Unsupported output head `{head}`. Expected one of {_VALID_HEADS}."
-        )
+        raise ValueError(f"Unsupported output head `{head}`. Expected one of {_VALID_HEADS}.")
     return head_lower
 
 
 def _prepare_log_targets(train_counts: np.ndarray, log_offset: float) -> np.ndarray:
     if log_offset <= 0.0:
-        raise ValueError(
-            f"log_offset must be > 0 for log_link head, got {log_offset}."
-        )
+        raise ValueError(f"log_offset must be > 0 for log_link head, got {log_offset}.")
     return np.log(train_counts.astype(np.float32) + np.float32(log_offset))
 
 
@@ -72,9 +68,7 @@ def _as_2d(arr: np.ndarray, n_outputs: int) -> np.ndarray:
     if arr.ndim == 1:
         return arr.reshape(-1, 1)
     if arr.shape[-1] != n_outputs:
-        raise ValueError(
-            f"Expected prediction with {n_outputs} outputs, got shape {arr.shape}."
-        )
+        raise ValueError(f"Expected prediction with {n_outputs} outputs, got shape {arr.shape}.")
     return arr
 
 
@@ -150,9 +144,7 @@ def _fit_per_neuron_poisson(
     train_pred = np.empty_like(train_counts, dtype=np.float32)
     eval_pred = np.empty((eval_features.shape[0], n_outputs), dtype=np.float32)
     for c in range(n_outputs):
-        model = _fit_poisson_glm_single(
-            train_features, train_counts[:, c], alpha=alpha
-        )
+        model = _fit_poisson_glm_single(train_features, train_counts[:, c], alpha=alpha)
         coef[:, c] = model.coef_.astype(np.float32)
         intercept[c] = float(model.intercept_)
         train_pred[:, c] = model.predict(train_features).astype(np.float32)

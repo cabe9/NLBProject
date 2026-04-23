@@ -17,14 +17,14 @@ fields as described in :func:`nlb_project.pipeline._rate_head_params`.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
 from .model_registry import MODEL_REGISTRY, ModelSpec, get_spec
-
 
 _VALID_OUTPUT_HEADS = ("linear", "log_link", "poisson_glm")
 DEFAULT_OUTPUT_HEAD = "log_link"
@@ -76,7 +76,7 @@ class ExperimentConfig:
     output_head: str = DEFAULT_OUTPUT_HEAD
 
     @classmethod
-    def from_mapping(cls, raw: dict[str, Any]) -> "ExperimentConfig":
+    def from_mapping(cls, raw: dict[str, Any]) -> ExperimentConfig:
         _require_keys(raw, _REQUIRED_TOP_LEVEL_KEYS, context="top-level config")
         _reject_unknown_keys(raw, _ALLOWED_TOP_LEVEL_KEYS, context="top-level config")
 
@@ -117,9 +117,7 @@ def _require_keys(mapping: dict[str, Any], required: Iterable[str], *, context: 
         raise ValueError(f"{context}: missing required keys {missing}")
 
 
-def _reject_unknown_keys(
-    mapping: dict[str, Any], allowed: Iterable[str], *, context: str
-) -> None:
+def _reject_unknown_keys(mapping: dict[str, Any], allowed: Iterable[str], *, context: str) -> None:
     extras = sorted(set(mapping) - set(allowed))
     if extras:
         raise ValueError(f"{context}: unknown keys {extras}")
@@ -155,11 +153,7 @@ def _validate_improvement(section: Any, spec: ModelSpec) -> dict[str, Any]:
 
     required_grids = {axis.grid_key for axis in spec.sweep_axes}
     override_keys = {name for name, _ in spec.improvement_overrides}
-    allowed = (
-        required_grids
-        | override_keys
-        | _OPTIONAL_IMPROVEMENT_KEYS
-    )
+    allowed = required_grids | override_keys | _OPTIONAL_IMPROVEMENT_KEYS
 
     _require_keys(section, required_grids, context=f"improvement[{spec.name}]")
     _reject_unknown_keys(section, allowed, context=f"improvement[{spec.name}]")
@@ -168,8 +162,7 @@ def _validate_improvement(section: Any, spec: ModelSpec) -> dict[str, Any]:
         grid = section[axis.grid_key]
         if not isinstance(grid, list) or len(grid) == 0:
             raise ValueError(
-                f"improvement[{spec.name}].{axis.grid_key}: expected non-empty list, "
-                f"got {grid!r}"
+                f"improvement[{spec.name}].{axis.grid_key}: expected non-empty list, got {grid!r}"
             )
 
     if "output_head" in section:
@@ -180,7 +173,7 @@ def _validate_improvement(section: Any, spec: ModelSpec) -> dict[str, Any]:
 
 def load_config(path: str | Path) -> ExperimentConfig:
     """Load and validate an experiment config from a YAML file."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     if not isinstance(raw, dict):
         raise ValueError(f"Config at {path} is not a YAML mapping")

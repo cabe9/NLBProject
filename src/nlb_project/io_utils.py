@@ -18,7 +18,9 @@ def write_metrics_csv(rows: list[dict], out_path: str | Path) -> None:
 
 def write_summary_md(rows: list[dict], out_path: str | Path) -> None:
     df = pd.DataFrame(rows)
-    model_type = df["model_type"].iloc[0] if "model_type" in df.columns and not df.empty else "unknown"
+    model_type = (
+        df["model_type"].iloc[0] if "model_type" in df.columns and not df.empty else "unknown"
+    )
     label_map = {"baseline": "reference", "improved": "selected"}
 
     def _fmt(value: object) -> str:

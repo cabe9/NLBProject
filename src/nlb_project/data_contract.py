@@ -4,7 +4,6 @@ import os
 from glob import glob
 from pathlib import Path
 
-
 _DEFAULT_DATASET_SUBPATH = {
     "mc_maze": "000128/sub-Jenkins",
     "mc_rtt": "000129/sub-Indy",
@@ -36,7 +35,6 @@ def resolve_data_path(dataset_name: str, data_path: str | None, data_prefix: str
     pattern = str(candidate / f"{data_prefix}*.nwb")
     if len(glob(pattern)) == 0:
         raise FileNotFoundError(
-            f"No NWB files matched pattern `{pattern}`. "
-            "Verify your dataset path and data_prefix."
+            f"No NWB files matched pattern `{pattern}`. Verify your dataset path and data_prefix."
         )
     return str(candidate)

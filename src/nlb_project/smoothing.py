@@ -64,8 +64,12 @@ def predict_rates(
     n_heldout = train_spikes_heldout.shape[2]
 
     sigma_bins = max(1, int(params.kern_sd_ms / bin_size_ms))
-    train_smoothed_heldin = gaussian_filter1d(train_spikes_heldin, sigma=sigma_bins, axis=1, mode="nearest")
-    eval_smoothed_heldin = gaussian_filter1d(eval_spikes_heldin, sigma=sigma_bins, axis=1, mode="nearest")
+    train_smoothed_heldin = gaussian_filter1d(
+        train_spikes_heldin, sigma=sigma_bins, axis=1, mode="nearest"
+    )
+    eval_smoothed_heldin = gaussian_filter1d(
+        eval_spikes_heldin, sigma=sigma_bins, axis=1, mode="nearest"
+    )
 
     train_factors = np.log(_flatten_trial_time(train_smoothed_heldin) + params.log_offset)
     eval_factors = np.log(_flatten_trial_time(eval_smoothed_heldin) + params.log_offset)

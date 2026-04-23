@@ -21,11 +21,11 @@ import itertools
 import json
 import logging
 import random
+from collections.abc import Iterator
 from hashlib import sha256
-from typing import Any, Iterator
+from typing import Any
 
 import numpy as np
-
 from nlb_tools.evaluation import evaluate
 from nlb_tools.make_tensors import (
     make_eval_input_tensors,
@@ -76,14 +76,14 @@ def _baseline_scalar_params(spec: ModelSpec, cfg: ExperimentConfig) -> dict[str,
     out: dict[str, Any] = {}
     for name, caster in spec.baseline_params:
         if name not in cfg.baseline:
-            raise KeyError(
-                f"Missing required baseline key `{name}` for model `{spec.name}`"
-            )
+            raise KeyError(f"Missing required baseline key `{name}` for model `{spec.name}`")
         out[name] = caster(cfg.baseline[name])
     return out
 
 
-def _rate_head_or_log_offset(spec: ModelSpec, cfg: ExperimentConfig, section: dict[str, Any]) -> dict[str, Any]:
+def _rate_head_or_log_offset(
+    spec: ModelSpec, cfg: ExperimentConfig, section: dict[str, Any]
+) -> dict[str, Any]:
     """Return the appropriate rate-readout extras for ``spec``.
 
     Models that use a pluggable rate head get ``output_head`` + ``log_offset``;
@@ -127,8 +127,7 @@ def iter_cv_candidates(
     for axis in spec.sweep_axes:
         if axis.grid_key not in cfg.improvement:
             raise KeyError(
-                f"Missing required improvement key `{axis.grid_key}` "
-                f"for model `{spec.name}`"
+                f"Missing required improvement key `{axis.grid_key}` for model `{spec.name}`"
             )
         grids.append([axis.caster(v) for v in cfg.improvement[axis.grid_key]])
 
@@ -138,7 +137,7 @@ def iter_cv_candidates(
     for values in itertools.product(*grids):
         params = dict(base)
         label_parts: list[str] = []
-        for axis, v in zip(spec.sweep_axes, values):
+        for axis, v in zip(spec.sweep_axes, values, strict=True):
             params[axis.param_name] = v
             label_parts.append(f"{axis.param_name}={v}")
         params.update(head_extras)
@@ -307,7 +306,9 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
 
     reference_hash = sha256(reference_path.read_bytes()).hexdigest()
     selected_hash = sha256(selected_path.read_bytes()).hexdigest()
-    logger.info("Prediction artifact sha256 reference=%s selected=%s", reference_hash, selected_hash)
+    logger.info(
+        "Prediction artifact sha256 reference=%s selected=%s", reference_hash, selected_hash
+    )
     params_differ = reference_params != selected_params
     if params_differ and reference_hash == selected_hash:
         logger.warning(

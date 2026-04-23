@@ -11,7 +11,9 @@ from .temporal_features import _flatten_trial_time, apply_input_transform
 logger = logging.getLogger(__name__)
 
 
-def _fit_diag_lds_params(latents_3d: np.ndarray, obs_noise_scale: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def _fit_diag_lds_params(
+    latents_3d: np.ndarray, obs_noise_scale: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Estimate a diagonal AR(1) latent model from train-only PCA latents.
 
     The PCA latents are treated as noisy observations of a smoother latent state:
@@ -36,7 +38,9 @@ def _fit_diag_lds_params(latents_3d: np.ndarray, obs_noise_scale: float) -> tupl
     return a, q, r, p0
 
 
-def _smooth_trial_diag_lds(obs: np.ndarray, a: np.ndarray, q: np.ndarray, r: np.ndarray, p0: np.ndarray) -> np.ndarray:
+def _smooth_trial_diag_lds(
+    obs: np.ndarray, a: np.ndarray, q: np.ndarray, r: np.ndarray, p0: np.ndarray
+) -> np.ndarray:
     """Run diagonal Kalman filtering + RTS smoothing on one trial."""
     tlen, dim = obs.shape
     filt_mean = np.zeros((tlen, dim), dtype=np.float32)
@@ -64,12 +68,16 @@ def _smooth_trial_diag_lds(obs: np.ndarray, a: np.ndarray, q: np.ndarray, r: np.
         denom[denom < 1e-6] = 1e-6
         smoother_gain = filt_var[t] * a / denom
         smooth_mean[t] = filt_mean[t] + smoother_gain * (smooth_mean[t + 1] - pred_mean[t + 1])
-        smooth_var[t] = filt_var[t] + smoother_gain * smoother_gain * (smooth_var[t + 1] - pred_var[t + 1])
+        smooth_var[t] = filt_var[t] + smoother_gain * smoother_gain * (
+            smooth_var[t + 1] - pred_var[t + 1]
+        )
 
     return smooth_mean
 
 
-def _smooth_latents(latents_3d: np.ndarray, a: np.ndarray, q: np.ndarray, r: np.ndarray, p0: np.ndarray) -> np.ndarray:
+def _smooth_latents(
+    latents_3d: np.ndarray, a: np.ndarray, q: np.ndarray, r: np.ndarray, p0: np.ndarray
+) -> np.ndarray:
     out = np.zeros_like(latents_3d, dtype=np.float32)
     for trial_idx in range(latents_3d.shape[0]):
         out[trial_idx] = _smooth_trial_diag_lds(latents_3d[trial_idx], a, q, r, p0)
@@ -117,7 +125,9 @@ def predict_lds_pca_latent_regression(
         )
 
     pca = PCA(n_components=n_components_eff, svd_solver="auto", random_state=0)
-    train_lat_obs = pca.fit_transform(train_x).reshape(n_train, tlen, n_components_eff).astype(np.float32)
+    train_lat_obs = (
+        pca.fit_transform(train_x).reshape(n_train, tlen, n_components_eff).astype(np.float32)
+    )
     eval_lat_obs = pca.transform(eval_x).reshape(n_eval, tlen, n_components_eff).astype(np.float32)
 
     a, q, r, p0 = _fit_diag_lds_params(train_lat_obs, obs_noise_scale=float(obs_noise_scale))

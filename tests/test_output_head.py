@@ -29,7 +29,9 @@ from nlb_project.models.pca_latent_regression import predict_pca_latent_regressi
 from nlb_project.models.ridge_direct import predict_ridge_direct
 
 
-def _poisson_tensors(seed: int, n_train: int = 6, n_eval: int = 4, tlen: int = 25, n_hi: int = 10, n_ho: int = 4):
+def _poisson_tensors(
+    seed: int, n_train: int = 6, n_eval: int = 4, tlen: int = 25, n_hi: int = 10, n_ho: int = 4
+):
     rng = np.random.default_rng(seed)
     train_hi = rng.poisson(0.5, (n_train, tlen, n_hi)).astype(np.float32)
     train_ho = rng.poisson(0.5, (n_train, tlen, n_ho)).astype(np.float32)
@@ -81,9 +83,7 @@ def test_linear_head_reproduces_legacy_behaviour_signature():
     assert eval_pred.min() >= 1e-9
     # Linear head can produce predictions that have been clipped from below,
     # so the floor should be hit at least somewhere on sparse data.
-    assert train_pred.min() == pytest.approx(1e-9, rel=0.0, abs=0.0) or np.all(
-        train_pred > 1e-9
-    )
+    assert train_pred.min() == pytest.approx(1e-9, rel=0.0, abs=0.0) or np.all(train_pred > 1e-9)
 
 
 def test_log_link_and_linear_heads_disagree_on_sparse_counts():
@@ -95,9 +95,7 @@ def test_log_link_and_linear_heads_disagree_on_sparse_counts():
     _, eval_log = fit_predict_rate_head(
         x_train, counts, x_eval, ridge_alpha=0.1, head="log_link", log_offset=1e-3
     )
-    _, eval_lin = fit_predict_rate_head(
-        x_train, counts, x_eval, ridge_alpha=0.1, head="linear"
-    )
+    _, eval_lin = fit_predict_rate_head(x_train, counts, x_eval, ridge_alpha=0.1, head="linear")
 
     # The two heads should produce materially different eval predictions.
     assert not np.allclose(eval_log, eval_lin, atol=1e-3)
@@ -185,9 +183,7 @@ def test_log_link_avoids_clip_floor_that_legacy_linear_hits():
     x_eval = rng.standard_normal((n_eval, n_features)).astype(np.float32)
     counts = rng.poisson(0.15, (n_train, n_out)).astype(np.float32)
 
-    _, eval_lin = fit_predict_rate_head(
-        x_train, counts, x_eval, ridge_alpha=1e-4, head="linear"
-    )
+    _, eval_lin = fit_predict_rate_head(x_train, counts, x_eval, ridge_alpha=1e-4, head="linear")
     _, eval_log = fit_predict_rate_head(
         x_train, counts, x_eval, ridge_alpha=1e-4, head="log_link", log_offset=1e-3
     )
@@ -204,7 +200,7 @@ def test_log_link_avoids_clip_floor_that_legacy_linear_hits():
     assert clip_rate_loglink < clip_rate_linear / 10.0, (
         f"log-link clipped {clip_rate_loglink:.3f} vs linear {clip_rate_linear:.3f}; "
         "expected log-link to avoid the clip floor that destroys co-bps"
-    ) 
+    )
 
 
 def test_poisson_glm_head_predicts_strictly_positive_rates():
@@ -299,9 +295,7 @@ def test_poisson_glm_reduced_rank_respects_rank_constraint():
 )
 def test_models_support_poisson_glm_head_end_to_end(predict_fn, kwargs):
     train_hi, train_ho, eval_hi = _poisson_tensors(seed=hash(predict_fn.__name__) & 0xFF)
-    out = predict_fn(
-        train_hi, train_ho, eval_hi, output_head="poisson_glm", **kwargs
-    )
+    out = predict_fn(train_hi, train_ho, eval_hi, output_head="poisson_glm", **kwargs)
     assert np.all(out["eval_rates_heldout"] > 0.0)
     assert np.all(out["train_rates_heldout"] > 0.0)
 

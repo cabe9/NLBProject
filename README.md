@@ -243,3 +243,22 @@ Most justified next step:
 - add a simple linear dynamical latent model or factor-analysis-style temporal latent model on the same benchmark path
 
 That would test whether the remaining gap is about low-rank structure alone, or about explicitly modeling latent dynamics over time.
+
+## Citation
+
+If you reference this project, please cite it as:
+
+```bibtex
+@software{telander_nlb_project,
+  author  = {Caleb Telander},
+  title   = {Neural Latents Benchmark (mc_maze) Analysis},
+  year    = {2026},
+  url     = {https://github.com/cabe9/NLBProject}
+}
+```
+
+The underlying benchmark and evaluation code come from [`nlb_tools`](https://github.com/neurallatents/nlb_tools); please also cite the Neural Latents Benchmark if you use the results.
+
+## License
+
+This project is released under the [MIT License](LICENSE).

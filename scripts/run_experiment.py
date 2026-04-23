@@ -10,7 +10,9 @@ from nlb_project.pipeline import run_full_experiment
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run NLB reference + selected experiment")
     parser.add_argument("--config", required=True, help="Path to YAML experiment config")
-    parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    parser.add_argument(
+        "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+    )
     return parser.parse_args()
 
 

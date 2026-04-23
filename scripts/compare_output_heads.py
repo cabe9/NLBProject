@@ -308,9 +308,7 @@ def _print_markdown(results: list[dict[str, Any]]) -> None:
     print()
     print("Notes:")
     print("- `old (tracked)` = value in results/benchmark_runs/<run>/metrics.csv.")
-    print(
-        "- `linear` = legacy Gaussian-ridge-on-counts head, clipped to [1e-9, 1e20]."
-    )
+    print("- `linear` = legacy Gaussian-ridge-on-counts head, clipped to [1e-9, 1e20].")
     print(
         "- `log_link` = Gaussian ridge on log(count + offset) + Duan smearing. Fast, "
         "strictly positive, but mis-specified for Poisson likelihood."

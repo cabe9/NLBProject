@@ -255,24 +255,30 @@ def write_comparison_svg(rows: list[dict[str, Any]], out_path: str | Path) -> No
     zero_x = x_pos(0.0)
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
-        '<style>',
-        'text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }',
-        '.title { font-size: 24px; font-weight: 700; }',
-        '.label { font-size: 14px; }',
-        '.value { font-size: 13px; font-weight: 600; }',
-        '.axis { stroke: #9aa4af; stroke-width: 1; }',
-        '.grid { stroke: #e5e7eb; stroke-width: 1; }',
-        '</style>',
+        "<style>",
+        "text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }",
+        ".title { font-size: 24px; font-weight: 700; }",
+        ".label { font-size: 14px; }",
+        ".value { font-size: 13px; font-weight: 600; }",
+        ".axis { stroke: #9aa4af; stroke-width: 1; }",
+        ".grid { stroke: #e5e7eb; stroke-width: 1; }",
+        "</style>",
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         '<text class="title" x="30" y="30">mc_maze co-bps comparison</text>',
     ]
 
     for tick in [min_plot, 0.0, max_plot]:
         x = x_pos(tick)
-        parts.append(f'<line class="grid" x1="{x:.1f}" y1="{top - 10}" x2="{x:.1f}" y2="{height - bottom + 10}"/>')
-        parts.append(f'<text class="label" x="{x:.1f}" y="{height - 18}" text-anchor="middle">{tick:.2f}</text>')
+        parts.append(
+            f'<line class="grid" x1="{x:.1f}" y1="{top - 10}" x2="{x:.1f}" y2="{height - bottom + 10}"/>'
+        )
+        parts.append(
+            f'<text class="label" x="{x:.1f}" y="{height - 18}" text-anchor="middle">{tick:.2f}</text>'
+        )
 
-    parts.append(f'<line class="axis" x1="{zero_x:.1f}" y1="{top - 10}" x2="{zero_x:.1f}" y2="{height - bottom + 10}"/>')
+    parts.append(
+        f'<line class="axis" x1="{zero_x:.1f}" y1="{top - 10}" x2="{zero_x:.1f}" y2="{height - bottom + 10}"/>'
+    )
 
     for idx, row in enumerate(rows):
         y = top + idx * row_h
@@ -282,7 +288,9 @@ def write_comparison_svg(rows: list[dict[str, Any]], out_path: str | Path) -> No
         bar_w = abs(x_pos(value) - zero_x)
         color = "#0f766e" if value >= 0 else "#b45309"
         parts.append(f'<text class="label" x="20" y="{y + 30}">{row["model_label"]}</text>')
-        parts.append(f'<rect x="{x0:.1f}" y="{bar_y}" width="{max(bar_w, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>')
+        parts.append(
+            f'<rect x="{x0:.1f}" y="{bar_y}" width="{max(bar_w, 1):.1f}" height="{bar_h}" rx="4" fill="{color}"/>'
+        )
         anchor = "start" if value >= 0 else "end"
         if value >= 0:
             label_x = max(x_pos(value) + 12, zero_x + 18)
@@ -305,7 +313,6 @@ def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> 
     top = 78
     row_h = 48
     bar_h = 22
-    bottom = 48
     max_rows = len(rows)
     chart_top = top + 38
     chart_height = row_h * max_rows
@@ -364,16 +371,16 @@ def write_metric_panel_svg(rows: list[dict[str, Any]], out_path: str | Path) -> 
 
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
-        '<style>',
-        'text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }',
-        '.title { font-size: 18px; font-weight: 700; }',
-        '.panel-title { font-size: 14px; font-weight: 700; }',
-        '.label { font-size: 12px; }',
-        '.tick { font-size: 11px; fill: #374151; }',
-        '.value { font-size: 12px; font-weight: 600; }',
-        '.axis { stroke: #9aa4af; stroke-width: 1; }',
-        '.grid { stroke: #e5e7eb; stroke-width: 1; }',
-        '</style>',
+        "<style>",
+        "text { font-family: Arial, Helvetica, sans-serif; fill: #1b1f24; }",
+        ".title { font-size: 18px; font-weight: 700; }",
+        ".panel-title { font-size: 14px; font-weight: 700; }",
+        ".label { font-size: 12px; }",
+        ".tick { font-size: 11px; fill: #374151; }",
+        ".value { font-size: 12px; font-weight: 600; }",
+        ".axis { stroke: #9aa4af; stroke-width: 1; }",
+        ".grid { stroke: #e5e7eb; stroke-width: 1; }",
+        "</style>",
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         '<text class="title" x="24" y="34">mc_maze model diagnostics</text>',
     ]

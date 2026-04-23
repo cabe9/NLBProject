@@ -1,9 +1,9 @@
 import numpy as np
 
-from nlb_project.models.lds_pca_latent_regression import predict_lds_pca_latent_regression
 from nlb_project.models.lagged_pca_latent_regression import predict_lagged_pca_latent_regression
 from nlb_project.models.lagged_reduced_rank_regression import predict_lagged_reduced_rank_regression
 from nlb_project.models.lagged_ridge_direct import predict_lagged_ridge_direct
+from nlb_project.models.lds_pca_latent_regression import predict_lds_pca_latent_regression
 
 
 def test_lagged_ridge_shapes():

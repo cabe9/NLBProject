@@ -18,8 +18,9 @@ in the pipeline. ``pipeline.py`` contains no per-model branches.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from .models import (
     predict_lagged_pca_latent_regression,
@@ -30,7 +31,6 @@ from .models import (
     predict_ridge_direct,
 )
 from .smoothing import SmoothingParams, predict_rates
-
 
 Caster = Callable[[Any], Any]
 
@@ -63,9 +63,7 @@ class ModelSpec:
     default_cv_folds: int = 3
     # Extra kwargs pulled from ExperimentConfig and passed to ``predict``,
     # but not serialized in the ``params`` dict written to metrics.csv.
-    extra_predict_kwargs_fn: Callable[[Any], dict[str, Any]] = field(
-        default=lambda cfg: {}
-    )
+    extra_predict_kwargs_fn: Callable[[Any], dict[str, Any]] = field(default=lambda cfg: {})
 
 
 def _smoothing_predict(
@@ -186,7 +184,5 @@ def get_spec(model_type: str) -> ModelSpec:
     """Look up a :class:`ModelSpec` by ``model_type`` with a helpful error."""
     if model_type not in MODEL_REGISTRY:
         known = sorted(MODEL_REGISTRY)
-        raise ValueError(
-            f"Unsupported model_type `{model_type}`. Expected one of {known}."
-        )
+        raise ValueError(f"Unsupported model_type `{model_type}`. Expected one of {known}.")
     return MODEL_REGISTRY[model_type]

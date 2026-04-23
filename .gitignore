@@ -22,4 +22,3 @@ results/benchmark_runs/*/*
 !results/benchmark_runs/model_comparison.svg
 !results/benchmark_runs/model_diagnostics.svg
 !results/benchmark_runs/experiment_log.md
-requirements/requirements.lock
