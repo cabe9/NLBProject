@@ -1,0 +1,20 @@
+# Model families
+
+All models share the same data path (NWB → tensors) and the same rate readout (`output_head`, default `log_link`). They differ only in how they map held-in spike counts to held-out neuron rates.
+
+| Family | File | Key idea |
+|---|---|---|
+| `smoothing` | `models/smoothing.py` | Causal Gaussian smoothing of held-in counts, then a Poisson GLM onto held-out neurons. Oldest baseline; no latent structure. |
+| `pca_latent_regression` | `models/pca_latent_regression.py` | Reduce held-in counts to a low-rank PCA latent (one time bin), then ridge-regress to held-out neurons. Tests whether a static latent is enough. |
+| `ridge_direct` | `models/ridge_direct.py` | Direct ridge regression from current-bin held-in counts to held-out counts. Simplest possible baseline; no latent, no history. |
+| `lagged_ridge_direct` | `models/lagged_ridge_direct.py` | Ridge regression from a short history window of held-in counts to held-out counts. Same as `ridge_direct` but with temporal context. |
+| `lagged_pca_latent_regression` | `models/lagged_pca_latent_regression.py` | Lag the held-in counts, compress with PCA on the lagged feature matrix, then ridge-regress. Strongest validated model in this repo. |
+| `lagged_reduced_rank_regression` | `models/lagged_reduced_rank_regression.py` | Supervised low-rank analogue of lagged PCA — ridge regression with a rank constraint on the coefficient matrix. Control for "is the PCA bottleneck doing real work?". |
+| `lds_pca_latent_regression` | `models/lds_pca_latent_regression.py` | PCA latent fit jointly with a linear dynamical system (Kalman + RTS smoother) over time, then ridge to held-out neurons. Exploratory; compares against the non-dynamical lagged baseline. |
+
+## Design principles
+
+- **One `fit_predict_*` per family.** Every model exposes a single callable that takes the built tensors and returns held-in + held-out rate predictions. No hidden state across calls.
+- **Train-only preprocessing.** Any scaling / PCA basis / lag-buffer initial values are fit on train data only, then applied frozen to eval tensors. This is enforced in `models/temporal_features.py`.
+- **Shared rate readout.** None of the models implement their own rate conversion; they all route predictions through `models/output_head.py`. This is what makes the cross-model comparison fair (see `docs/output_head_postmortem.md` for why this matters).
+- **Declarative registration.** Each family is registered in `src/nlb_project/model_registry.py` with its parameter names, sweep axes, and CV defaults. Adding a new family means writing the model file and appending one `ModelSpec` entry.
