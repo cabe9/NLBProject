@@ -1,4 +1,4 @@
-.PHONY: setup test run lock get-data portfolio-artifacts
+.PHONY: setup test run lock get-data portfolio-artifacts lint format notebook
 
 setup:
 	python -m pip install --upgrade pip
@@ -6,6 +6,16 @@ setup:
 
 test:
 	pytest
+
+lint:
+	ruff check .
+
+format:
+	ruff format .
+
+notebook:
+	jupyter nbconvert --to notebook --execute notebooks/results_walkthrough.ipynb \
+		--output results_walkthrough.ipynb
 
 get-data:
 	python -m scripts.get_data --dataset mc_maze --out data/raw
