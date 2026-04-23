@@ -262,3 +262,14 @@ The underlying benchmark and evaluation code come from [`nlb_tools`](https://git
 ## License
 
 This project is released under the [MIT License](LICENSE).
+
+<!--
+Suggested GitHub topics (set via the repo "About" gear on GitHub, not in-file):
+  neuroscience
+  machine-learning
+  neural-decoding
+  time-series
+  reproducibility
+  benchmarking
+-->
+
