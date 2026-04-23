@@ -42,8 +42,6 @@ from .model_registry import MODEL_REGISTRY, ModelSpec, get_spec
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_OUTPUT_HEAD = "log_link"
-
 
 def set_seeds(seed: int) -> None:
     random.seed(seed)
@@ -60,11 +58,11 @@ def _rate_head_params(section: dict[str, Any], cfg: ExperimentConfig) -> dict[st
 
     1. explicit value in ``section`` (so a sweep may override the readout
        without editing the top-level config),
-    2. the top-level :class:`ExperimentConfig` field (``cfg.log_offset``),
-    3. repo-wide default (``output_head`` only).
+    2. the top-level :class:`ExperimentConfig` fields
+       (``cfg.output_head``, ``cfg.log_offset``).
     """
     return {
-        "output_head": str(section.get("output_head", DEFAULT_OUTPUT_HEAD)),
+        "output_head": str(section.get("output_head", cfg.output_head)),
         "log_offset": float(section.get("log_offset", cfg.log_offset)),
     }
 
@@ -353,7 +351,6 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
 
 
 __all__ = [
-    "DEFAULT_OUTPUT_HEAD",
     "MODEL_REGISTRY",
     "build_reference_params",
     "iter_cv_candidates",
