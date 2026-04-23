@@ -1,3 +1,20 @@
+"""Experiment orchestration.
+
+Responsibilities:
+
+- load NWB data through :class:`nlb_tools.nwb_interface.NWBDataset`,
+- build train/eval tensors via :mod:`nlb_tools.make_tensors`,
+- run a reference (baseline) fit and a CV-selected fit for the requested
+  :class:`nlb_project.model_registry.ModelSpec`,
+- score both under :func:`nlb_tools.evaluation.evaluate`,
+- write tracked artifacts (``metrics.csv``, ``ablation.csv``, ``summary.md``,
+  ``run_metadata.json``) plus prediction HDF5s under ``cfg.output_dir``.
+
+The per-model bookkeeping (which params are required, which axes are swept,
+what kwargs the predict function takes) lives in :mod:`model_registry`; this
+file contains no per-model branches.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -5,8 +22,7 @@ import json
 import logging
 import random
 from hashlib import sha256
-from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import numpy as np
 
@@ -22,17 +38,11 @@ from nlb_tools.nwb_interface import NWBDataset
 from .config import ExperimentConfig
 from .data_contract import resolve_data_path
 from .io_utils import ensure_dir, write_metrics_csv, write_summary_md
-from .models import (
-    predict_lds_pca_latent_regression,
-    predict_lagged_pca_latent_regression,
-    predict_lagged_reduced_rank_regression,
-    predict_lagged_ridge_direct,
-    predict_pca_latent_regression,
-    predict_ridge_direct,
-)
-from .smoothing import SmoothingParams, predict_rates
+from .model_registry import MODEL_REGISTRY, ModelSpec, get_spec
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_OUTPUT_HEAD = "log_link"
 
 
 def set_seeds(seed: int) -> None:
@@ -40,28 +50,104 @@ def set_seeds(seed: int) -> None:
     np.random.seed(seed)
 
 
-_DEFAULT_OUTPUT_HEAD = "log_link"
+# -------- param assembly ----------------------------------------------------
 
 
 def _rate_head_params(section: dict[str, Any], cfg: ExperimentConfig) -> dict[str, Any]:
-    """Pull rate-readout knobs from a baseline/improvement config section.
+    """Pull rate-readout params from a baseline/improvement section.
 
     Resolution order for each key:
 
-    1. Explicit value in the baseline/improvement ``section`` (lets a single
-       sweep override the readout without editing the top-level config).
-    2. The top-level ``ExperimentConfig`` field (``cfg.log_offset``); this is
-       what the YAML files actually set, and previously it was silently
-       ignored for every non-smoothing model.
-    3. Repo-wide default (``output_head`` only).
-
-    The returned dict is merged into model-parameter dicts so every model
-    fit gets a consistent rate-readout spec.
+    1. explicit value in ``section`` (so a sweep may override the readout
+       without editing the top-level config),
+    2. the top-level :class:`ExperimentConfig` field (``cfg.log_offset``),
+    3. repo-wide default (``output_head`` only).
     """
     return {
-        "output_head": str(section.get("output_head", _DEFAULT_OUTPUT_HEAD)),
+        "output_head": str(section.get("output_head", DEFAULT_OUTPUT_HEAD)),
         "log_offset": float(section.get("log_offset", cfg.log_offset)),
     }
+
+
+def _baseline_scalar_params(spec: ModelSpec, cfg: ExperimentConfig) -> dict[str, Any]:
+    """Cast every ``spec.baseline_params`` key out of ``cfg.baseline``.
+
+    Missing keys raise ``KeyError``; the registry enumerates exactly the
+    keys each model requires, so an underspecified YAML fails fast.
+    """
+    out: dict[str, Any] = {}
+    for name, caster in spec.baseline_params:
+        if name not in cfg.baseline:
+            raise KeyError(
+                f"Missing required baseline key `{name}` for model `{spec.name}`"
+            )
+        out[name] = caster(cfg.baseline[name])
+    return out
+
+
+def _rate_head_or_log_offset(spec: ModelSpec, cfg: ExperimentConfig, section: dict[str, Any]) -> dict[str, Any]:
+    """Return the appropriate rate-readout extras for ``spec``.
+
+    Models that use a pluggable rate head get ``output_head`` + ``log_offset``;
+    smoothing gets a bare ``log_offset`` (it uses its own Poisson head).
+    Models declaring neither receive ``{}``.
+    """
+    if spec.uses_rate_head:
+        return _rate_head_params(section, cfg)
+    if spec.passes_log_offset:
+        return {"log_offset": float(cfg.log_offset)}
+    return {}
+
+
+def build_reference_params(spec: ModelSpec, cfg: ExperimentConfig) -> dict[str, Any]:
+    """Assemble the reference (baseline) params dict, exactly as serialized."""
+    params = _baseline_scalar_params(spec, cfg)
+    params.update(_rate_head_or_log_offset(spec, cfg, cfg.baseline))
+    return params
+
+
+def _apply_improvement_overrides(
+    spec: ModelSpec, cfg: ExperimentConfig, base: dict[str, Any]
+) -> dict[str, Any]:
+    """Overlay ``cfg.improvement`` values for keys in ``spec.improvement_overrides``.
+
+    Missing keys in improvement fall back to the value already present in
+    ``base`` (which came from baseline), preserving the historical semantics.
+    """
+    out = dict(base)
+    for name, caster in spec.improvement_overrides:
+        if name in cfg.improvement:
+            out[name] = caster(cfg.improvement[name])
+    return out
+
+
+def iter_cv_candidates(
+    spec: ModelSpec, cfg: ExperimentConfig
+) -> Iterator[tuple[dict[str, Any], str]]:
+    """Yield ``(params_dict, label)`` pairs for every CV candidate."""
+    grids: list[list[Any]] = []
+    for axis in spec.sweep_axes:
+        if axis.grid_key not in cfg.improvement:
+            raise KeyError(
+                f"Missing required improvement key `{axis.grid_key}` "
+                f"for model `{spec.name}`"
+            )
+        grids.append([axis.caster(v) for v in cfg.improvement[axis.grid_key]])
+
+    base = _apply_improvement_overrides(spec, cfg, _baseline_scalar_params(spec, cfg))
+    head_extras = _rate_head_or_log_offset(spec, cfg, cfg.improvement)
+
+    for values in itertools.product(*grids):
+        params = dict(base)
+        label_parts: list[str] = []
+        for axis, v in zip(spec.sweep_axes, values):
+            params[axis.param_name] = v
+            label_parts.append(f"{axis.param_name}={v}")
+        params.update(head_extras)
+        yield params, f"cv({','.join(label_parts)})"
+
+
+# -------- CV bookkeeping ---------------------------------------------------
 
 
 def _dataset_key(dataset_name: str, bin_size_ms: int) -> str:
@@ -74,131 +160,6 @@ def _split_key(dataset_name: str, bin_size_ms: int) -> str:
     if "maze_" in dataset_name:
         return f"mc_maze_scaling{suf}_split"
     return f"{dataset_name}{suf}_split"
-
-
-def _run_single_eval(
-    dataset: NWBDataset,
-    cfg: ExperimentConfig,
-    train_split,
-    eval_split,
-    params: dict[str, Any],
-    include_psth: bool,
-    run_name: str,
-) -> tuple[dict[str, np.ndarray], dict[str, float]]:
-    logger.info("[%s] model_type=%s effective_params=%s", run_name, cfg.model_type, params)
-    train_dict = make_train_input_tensors(
-        dataset,
-        cfg.dataset_name,
-        trial_split=train_split,
-        save_file=False,
-    )
-    eval_dict = make_eval_input_tensors(
-        dataset,
-        cfg.dataset_name,
-        trial_split=eval_split,
-        save_file=False,
-    )
-    target_dict = make_eval_target_tensors(
-        dataset,
-        cfg.dataset_name,
-        train_trial_split=train_split,
-        eval_trial_split=eval_split,
-        save_file=False,
-        include_psth=include_psth,
-    )
-
-    if cfg.model_type == "smoothing":
-        smooth_params = SmoothingParams(
-            kern_sd_ms=params["kern_sd_ms"],
-            alpha=params["alpha"],
-            log_offset=params["log_offset"],
-        )
-        preds = predict_rates(
-            train_dict["train_spikes_heldin"],
-            train_dict["train_spikes_heldout"],
-            eval_dict["eval_spikes_heldin"],
-            smooth_params,
-            cfg.bin_size_ms,
-        )
-    elif cfg.model_type == "pca_latent_regression":
-        preds = predict_pca_latent_regression(
-            train_dict["train_spikes_heldin"],
-            train_dict["train_spikes_heldout"],
-            eval_dict["eval_spikes_heldin"],
-            n_components=params["n_components"],
-            ridge_alpha=params["ridge_alpha"],
-            output_head=params.get("output_head", "log_link"),
-            log_offset=params.get("log_offset", 1e-3),
-        )
-    elif cfg.model_type == "ridge_direct":
-        preds = predict_ridge_direct(
-            train_dict["train_spikes_heldin"],
-            train_dict["train_spikes_heldout"],
-            eval_dict["eval_spikes_heldin"],
-            ridge_alpha=params["ridge_alpha"],
-            output_head=params.get("output_head", "log_link"),
-            log_offset=params.get("log_offset", 1e-3),
-        )
-    elif cfg.model_type == "lagged_ridge_direct":
-        preds = predict_lagged_ridge_direct(
-            train_dict["train_spikes_heldin"],
-            train_dict["train_spikes_heldout"],
-            eval_dict["eval_spikes_heldin"],
-            ridge_alpha=params["ridge_alpha"],
-            history_bins=params["history_bins"],
-            input_transform=params["input_transform"],
-            output_head=params.get("output_head", "log_link"),
-            log_offset=params.get("log_offset", 1e-3),
-        )
-    elif cfg.model_type == "lagged_pca_latent_regression":
-        preds = predict_lagged_pca_latent_regression(
-            train_dict["train_spikes_heldin"],
-            train_dict["train_spikes_heldout"],
-            eval_dict["eval_spikes_heldin"],
-            n_components=params["n_components"],
-            ridge_alpha=params["ridge_alpha"],
-            history_bins=params["history_bins"],
-            input_transform=params["input_transform"],
-            output_head=params.get("output_head", "log_link"),
-            log_offset=params.get("log_offset", 1e-3),
-        )
-    elif cfg.model_type == "lagged_reduced_rank_regression":
-        preds = predict_lagged_reduced_rank_regression(
-            train_dict["train_spikes_heldin"],
-            train_dict["train_spikes_heldout"],
-            eval_dict["eval_spikes_heldin"],
-            rank=params["rank"],
-            ridge_alpha=params["ridge_alpha"],
-            history_bins=params["history_bins"],
-            input_transform=params["input_transform"],
-            output_head=params.get("output_head", "log_link"),
-            log_offset=params.get("log_offset", 1e-3),
-        )
-    elif cfg.model_type == "lds_pca_latent_regression":
-        preds = predict_lds_pca_latent_regression(
-            train_dict["train_spikes_heldin"],
-            train_dict["train_spikes_heldout"],
-            eval_dict["eval_spikes_heldin"],
-            n_components=params["n_components"],
-            ridge_alpha=params["ridge_alpha"],
-            input_transform=params["input_transform"],
-            obs_noise_scale=params["obs_noise_scale"],
-            output_head=params.get("output_head", "log_link"),
-            log_offset=params.get("log_offset", 1e-3),
-        )
-    else:
-        raise ValueError(
-            f"Unsupported model_type `{cfg.model_type}`. Expected one of "
-            f"['smoothing', 'pca_latent_regression', 'ridge_direct', "
-            f"'lagged_ridge_direct', 'lagged_pca_latent_regression', "
-            f"'lagged_reduced_rank_regression', 'lds_pca_latent_regression']."
-        )
-
-    output_dict = {_dataset_key(cfg.dataset_name, cfg.bin_size_ms): preds}
-    metrics = evaluate(target_dict, output_dict)[0][_split_key(cfg.dataset_name, cfg.bin_size_ms)]
-    if not np.isfinite(metrics["co-bps"]):
-        raise ValueError("co-bps is not finite; check preprocessing/model outputs")
-    return output_dict, metrics
 
 
 def _build_cv_masks(dataset: NWBDataset, split_name: str, n_folds: int, seed: int):
@@ -217,372 +178,93 @@ def _build_cv_masks(dataset: NWBDataset, split_name: str, n_folds: int, seed: in
     return folds
 
 
-def _select_best_smoothing_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
-    imp = cfg.improvement
-    folds = _build_cv_masks(dataset, cfg.train_split, imp["cv_folds"], cfg.seed)
+# -------- evaluation --------------------------------------------------------
 
-    best_score = -np.inf
-    best_params: dict[str, Any] | None = None
-    for kern_sd, alpha in itertools.product(imp["kern_sd_grid"], imp["alpha_grid"]):
-        fold_scores = []
-        params = {"kern_sd_ms": kern_sd, "alpha": alpha, "log_offset": cfg.log_offset}
-        for train_mask, eval_mask in folds:
-            _, metrics = _run_single_eval(
-                dataset,
-                cfg,
-                train_mask,
-                eval_mask,
-                params,
-                include_psth=False,
-                run_name=f"cv(kern_sd={kern_sd},alpha={alpha})",
-            )
-            fold_scores.append(metrics["co-bps"])
-        mean_score = float(np.mean(fold_scores))
-        logger.info(
-            "CV candidate kern_sd=%s alpha=%s -> mean co-bps %.4f",
-            kern_sd,
-            alpha,
-            mean_score,
-        )
-        if mean_score > best_score:
-            best_score = mean_score
-            best_params = params
 
-    assert best_params is not None
-    logger.info(
-        "Selected params for smoothing: kern_sd=%s alpha=%s (cv mean co-bps %.4f)",
-        best_params["kern_sd_ms"],
-        best_params["alpha"],
-        best_score,
+def _run_single_eval(
+    dataset: NWBDataset,
+    cfg: ExperimentConfig,
+    spec: ModelSpec,
+    train_split,
+    eval_split,
+    params: dict[str, Any],
+    include_psth: bool,
+    run_name: str,
+) -> tuple[dict[str, np.ndarray], dict[str, float]]:
+    logger.info("[%s] model_type=%s effective_params=%s", run_name, spec.name, params)
+    train_dict = make_train_input_tensors(
+        dataset, cfg.dataset_name, trial_split=train_split, save_file=False
     )
-    return best_params
-
-
-def _select_best_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
-    imp = cfg.improvement
-    cv_folds = imp.get("cv_folds", 3)
-    n_components_grid = imp.get("n_components_grid", [5, 10, 20, 30])
-    ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1, 1.0])
-    folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
-
-    head_params = _rate_head_params(imp if imp else cfg.baseline, cfg)
-
-    best_score = -np.inf
-    best_params: dict[str, Any] | None = None
-    for n_components, ridge_alpha in itertools.product(n_components_grid, ridge_alpha_grid):
-        fold_scores = []
-        params = {
-            "n_components": int(n_components),
-            "ridge_alpha": float(ridge_alpha),
-            **head_params,
-        }
-        for train_mask, eval_mask in folds:
-            _, metrics = _run_single_eval(
-                dataset,
-                cfg,
-                train_mask,
-                eval_mask,
-                params,
-                include_psth=False,
-                run_name=f"cv(n_components={n_components},ridge_alpha={ridge_alpha})",
-            )
-            fold_scores.append(metrics["co-bps"])
-        mean_score = float(np.mean(fold_scores))
-        logger.info(
-            "CV candidate n_components=%s ridge_alpha=%s -> mean co-bps %.4f",
-            n_components,
-            ridge_alpha,
-            mean_score,
-        )
-        if mean_score > best_score:
-            best_score = mean_score
-            best_params = params
-
-    assert best_params is not None
-    logger.info(
-        "Selected params for PCA latent regression: n_components=%s ridge_alpha=%s (cv mean co-bps %.4f)",
-        best_params["n_components"],
-        best_params["ridge_alpha"],
-        best_score,
+    eval_dict = make_eval_input_tensors(
+        dataset, cfg.dataset_name, trial_split=eval_split, save_file=False
     )
-    return best_params
-
-
-def _select_best_ridge_direct_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
-    imp = cfg.improvement
-    cv_folds = imp.get("cv_folds", 3)
-    ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1])
-    folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
-
-    head_params = _rate_head_params(imp if imp else cfg.baseline, cfg)
-
-    best_score = -np.inf
-    best_params: dict[str, Any] | None = None
-    for ridge_alpha in ridge_alpha_grid:
-        fold_scores = []
-        params = {"ridge_alpha": float(ridge_alpha), **head_params}
-        for train_mask, eval_mask in folds:
-            _, metrics = _run_single_eval(
-                dataset,
-                cfg,
-                train_mask,
-                eval_mask,
-                params,
-                include_psth=False,
-                run_name=f"cv(ridge_alpha={ridge_alpha})",
-            )
-            fold_scores.append(metrics["co-bps"])
-        mean_score = float(np.mean(fold_scores))
-        logger.info(
-            "CV candidate ridge_alpha=%s -> mean co-bps %.4f",
-            ridge_alpha,
-            mean_score,
-        )
-        if mean_score > best_score:
-            best_score = mean_score
-            best_params = params
-
-    assert best_params is not None
-    logger.info(
-        "Selected params for ridge direct: ridge_alpha=%s (cv mean co-bps %.4f)",
-        best_params["ridge_alpha"],
-        best_score,
+    target_dict = make_eval_target_tensors(
+        dataset,
+        cfg.dataset_name,
+        train_trial_split=train_split,
+        eval_trial_split=eval_split,
+        save_file=False,
+        include_psth=include_psth,
     )
-    return best_params
+
+    extra_kwargs = spec.extra_predict_kwargs_fn(cfg)
+    preds = spec.predict(
+        train_dict["train_spikes_heldin"],
+        train_dict["train_spikes_heldout"],
+        eval_dict["eval_spikes_heldin"],
+        **params,
+        **extra_kwargs,
+    )
+
+    output_dict = {_dataset_key(cfg.dataset_name, cfg.bin_size_ms): preds}
+    metrics = evaluate(target_dict, output_dict)[0][_split_key(cfg.dataset_name, cfg.bin_size_ms)]
+    if not np.isfinite(metrics["co-bps"]):
+        raise ValueError("co-bps is not finite; check preprocessing/model outputs")
+    return output_dict, metrics
 
 
-def _select_best_lagged_ridge_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
-    imp = cfg.improvement
-    cv_folds = imp.get("cv_folds", 3)
-    ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1])
-    history_bins_grid = imp.get("history_bins_grid", [3, 5, 9])
-    input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt"))
-    head_params = _rate_head_params(imp if imp else cfg.baseline, cfg)
+def _select_best_params(
+    dataset: NWBDataset,
+    cfg: ExperimentConfig,
+    spec: ModelSpec,
+) -> dict[str, Any]:
+    """Generic CV grid search over every ``spec.sweep_axes`` axis."""
+    cv_folds = int(cfg.improvement.get("cv_folds", spec.default_cv_folds))
     folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
 
     best_score = -np.inf
     best_params: dict[str, Any] | None = None
-    for history_bins, ridge_alpha in itertools.product(history_bins_grid, ridge_alpha_grid):
-        fold_scores = []
-        params = {
-            "history_bins": int(history_bins),
-            "ridge_alpha": float(ridge_alpha),
-            "input_transform": input_transform,
-            **head_params,
-        }
+    for params, label in iter_cv_candidates(spec, cfg):
+        fold_scores: list[float] = []
         for train_mask, eval_mask in folds:
             _, metrics = _run_single_eval(
                 dataset,
                 cfg,
+                spec,
                 train_mask,
                 eval_mask,
                 params,
                 include_psth=False,
-                run_name=f"cv(history_bins={history_bins},ridge_alpha={ridge_alpha})",
+                run_name=label,
             )
             fold_scores.append(metrics["co-bps"])
         mean_score = float(np.mean(fold_scores))
-        logger.info(
-            "CV candidate history_bins=%s ridge_alpha=%s input_transform=%s -> mean co-bps %.4f",
-            history_bins,
-            ridge_alpha,
-            input_transform,
-            mean_score,
-        )
+        logger.info("CV candidate %s -> mean co-bps %.4f", label, mean_score)
         if mean_score > best_score:
             best_score = mean_score
             best_params = params
 
-    assert best_params is not None
+    assert best_params is not None, f"No CV candidates for model `{spec.name}`"
     logger.info(
-        "Selected params for lagged ridge direct: history_bins=%s ridge_alpha=%s input_transform=%s (cv mean co-bps %.4f)",
-        best_params["history_bins"],
-        best_params["ridge_alpha"],
-        best_params["input_transform"],
+        "Selected params for %s: %s (cv mean co-bps %.4f)",
+        spec.name,
+        best_params,
         best_score,
     )
     return best_params
 
 
-def _select_best_lagged_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
-    imp = cfg.improvement
-    cv_folds = imp.get("cv_folds", 3)
-    n_components_grid = imp.get("n_components_grid", [10, 20, 40, 80])
-    ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1, 1.0])
-    history_bins_grid = imp.get("history_bins_grid", [3, 5, 9])
-    input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
-    head_params = _rate_head_params(imp if imp else cfg.baseline, cfg)
-    folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
-
-    best_score = -np.inf
-    best_params: dict[str, Any] | None = None
-    for history_bins, n_components, ridge_alpha in itertools.product(
-        history_bins_grid, n_components_grid, ridge_alpha_grid
-    ):
-        fold_scores = []
-        params = {
-            "history_bins": int(history_bins),
-            "n_components": int(n_components),
-            "ridge_alpha": float(ridge_alpha),
-            "input_transform": input_transform,
-            **head_params,
-        }
-        for train_mask, eval_mask in folds:
-            _, metrics = _run_single_eval(
-                dataset,
-                cfg,
-                train_mask,
-                eval_mask,
-                params,
-                include_psth=False,
-                run_name=(
-                    f"cv(history_bins={history_bins},n_components={n_components},"
-                    f"ridge_alpha={ridge_alpha})"
-                ),
-            )
-            fold_scores.append(metrics["co-bps"])
-        mean_score = float(np.mean(fold_scores))
-        logger.info(
-            "CV candidate history_bins=%s n_components=%s ridge_alpha=%s input_transform=%s -> mean co-bps %.4f",
-            history_bins,
-            n_components,
-            ridge_alpha,
-            input_transform,
-            mean_score,
-        )
-        if mean_score > best_score:
-            best_score = mean_score
-            best_params = params
-
-    assert best_params is not None
-    logger.info(
-        "Selected params for lagged PCA latent regression: history_bins=%s n_components=%s ridge_alpha=%s input_transform=%s (cv mean co-bps %.4f)",
-        best_params["history_bins"],
-        best_params["n_components"],
-        best_params["ridge_alpha"],
-        best_params["input_transform"],
-        best_score,
-    )
-    return best_params
-
-
-def _select_best_lagged_rrr_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
-    imp = cfg.improvement
-    cv_folds = imp.get("cv_folds", 3)
-    history_bins_grid = imp.get("history_bins_grid", [3, 5, 9])
-    rank_grid = imp.get("rank_grid", [5, 10, 20, 40])
-    ridge_alpha_grid = imp.get("ridge_alpha_grid", [1e-3, 1e-2, 1e-1, 1.0])
-    input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
-    head_params = _rate_head_params(imp if imp else cfg.baseline, cfg)
-    folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
-
-    best_score = -np.inf
-    best_params: dict[str, Any] | None = None
-    for history_bins, rank, ridge_alpha in itertools.product(
-        history_bins_grid, rank_grid, ridge_alpha_grid
-    ):
-        fold_scores = []
-        params = {
-            "history_bins": int(history_bins),
-            "rank": int(rank),
-            "ridge_alpha": float(ridge_alpha),
-            "input_transform": input_transform,
-            **head_params,
-        }
-        for train_mask, eval_mask in folds:
-            _, metrics = _run_single_eval(
-                dataset,
-                cfg,
-                train_mask,
-                eval_mask,
-                params,
-                include_psth=False,
-                run_name=(
-                    f"cv(history_bins={history_bins},rank={rank},"
-                    f"ridge_alpha={ridge_alpha})"
-                ),
-            )
-            fold_scores.append(metrics["co-bps"])
-        mean_score = float(np.mean(fold_scores))
-        logger.info(
-            "CV candidate history_bins=%s rank=%s ridge_alpha=%s input_transform=%s -> mean co-bps %.4f",
-            history_bins,
-            rank,
-            ridge_alpha,
-            input_transform,
-            mean_score,
-        )
-        if mean_score > best_score:
-            best_score = mean_score
-            best_params = params
-
-    assert best_params is not None
-    logger.info(
-        "Selected params for lagged reduced-rank regression: history_bins=%s rank=%s ridge_alpha=%s input_transform=%s (cv mean co-bps %.4f)",
-        best_params["history_bins"],
-        best_params["rank"],
-        best_params["ridge_alpha"],
-        best_params["input_transform"],
-        best_score,
-    )
-    return best_params
-
-
-def _select_best_lds_pca_params(dataset: NWBDataset, cfg: ExperimentConfig) -> dict[str, Any]:
-    imp = cfg.improvement
-    cv_folds = imp.get("cv_folds", 2)
-    n_components_grid = imp.get("n_components_grid", [5, 10, 20])
-    ridge_alpha = float(imp.get("ridge_alpha", cfg.baseline.get("ridge_alpha", 0.1)))
-    input_transform = imp.get("input_transform", cfg.baseline.get("input_transform", "sqrt_zscore"))
-    obs_noise_scale = float(imp.get("obs_noise_scale", cfg.baseline.get("obs_noise_scale", 0.1)))
-    head_params = _rate_head_params(imp if imp else cfg.baseline, cfg)
-    folds = _build_cv_masks(dataset, cfg.train_split, cv_folds, cfg.seed)
-
-    best_score = -np.inf
-    best_params: dict[str, Any] | None = None
-    for n_components in n_components_grid:
-        fold_scores = []
-        params = {
-            "n_components": int(n_components),
-            "ridge_alpha": ridge_alpha,
-            "input_transform": input_transform,
-            "obs_noise_scale": obs_noise_scale,
-            **head_params,
-        }
-        for train_mask, eval_mask in folds:
-            _, metrics = _run_single_eval(
-                dataset,
-                cfg,
-                train_mask,
-                eval_mask,
-                params,
-                include_psth=False,
-                run_name=f"cv(n_components={n_components})",
-            )
-            fold_scores.append(metrics["co-bps"])
-        mean_score = float(np.mean(fold_scores))
-        logger.info(
-            "CV candidate n_components=%s ridge_alpha=%s input_transform=%s obs_noise_scale=%s -> mean co-bps %.4f",
-            n_components,
-            ridge_alpha,
-            input_transform,
-            obs_noise_scale,
-            mean_score,
-        )
-        if mean_score > best_score:
-            best_score = mean_score
-            best_params = params
-
-    assert best_params is not None
-    logger.info(
-        "Selected params for LDS PCA latent regression: n_components=%s ridge_alpha=%s input_transform=%s obs_noise_scale=%s (cv mean co-bps %.4f)",
-        best_params["n_components"],
-        best_params["ridge_alpha"],
-        best_params["input_transform"],
-        best_params["obs_noise_scale"],
-        best_score,
-    )
-    return best_params
+# -------- top-level driver --------------------------------------------------
 
 
 def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
@@ -590,80 +272,19 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
     out_dir = ensure_dir(cfg.output_dir)
     pred_dir = ensure_dir(out_dir / "predictions")
 
+    spec = get_spec(cfg.model_type)
+
     dataset_path = resolve_data_path(cfg.dataset_name, cfg.data_path, cfg.data_prefix)
-    dataset = NWBDataset(
-        dataset_path,
-        cfg.data_prefix,
-        skip_fields=cfg.skip_fields,
-    )
+    dataset = NWBDataset(dataset_path, cfg.data_prefix, skip_fields=cfg.skip_fields)
     dataset.resample(cfg.bin_size_ms)
 
-    if cfg.model_type == "smoothing":
-        reference_params: dict[str, Any] = {
-            "kern_sd_ms": cfg.baseline["kern_sd_ms"],
-            "alpha": cfg.baseline["alpha"],
-            "log_offset": cfg.log_offset,
-        }
-        selected_params = _select_best_smoothing_params(dataset, cfg)
-    elif cfg.model_type == "pca_latent_regression":
-        reference_params = {
-            "n_components": int(cfg.baseline.get("n_components", 10)),
-            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
-            **_rate_head_params(cfg.baseline, cfg),
-        }
-        selected_params = _select_best_pca_params(dataset, cfg)
-    elif cfg.model_type == "ridge_direct":
-        reference_params = {
-            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
-            **_rate_head_params(cfg.baseline, cfg),
-        }
-        selected_params = _select_best_ridge_direct_params(dataset, cfg)
-    elif cfg.model_type == "lagged_ridge_direct":
-        reference_params = {
-            "history_bins": int(cfg.baseline.get("history_bins", 5)),
-            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
-            "input_transform": cfg.baseline.get("input_transform", "sqrt"),
-            **_rate_head_params(cfg.baseline, cfg),
-        }
-        selected_params = _select_best_lagged_ridge_params(dataset, cfg)
-    elif cfg.model_type == "lagged_pca_latent_regression":
-        reference_params = {
-            "history_bins": int(cfg.baseline.get("history_bins", 5)),
-            "n_components": int(cfg.baseline.get("n_components", 20)),
-            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
-            "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
-            **_rate_head_params(cfg.baseline, cfg),
-        }
-        selected_params = _select_best_lagged_pca_params(dataset, cfg)
-    elif cfg.model_type == "lagged_reduced_rank_regression":
-        reference_params = {
-            "history_bins": int(cfg.baseline.get("history_bins", 5)),
-            "rank": int(cfg.baseline.get("rank", 10)),
-            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
-            "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
-            **_rate_head_params(cfg.baseline, cfg),
-        }
-        selected_params = _select_best_lagged_rrr_params(dataset, cfg)
-    elif cfg.model_type == "lds_pca_latent_regression":
-        reference_params = {
-            "n_components": int(cfg.baseline.get("n_components", 10)),
-            "ridge_alpha": float(cfg.baseline.get("ridge_alpha", 0.1)),
-            "input_transform": cfg.baseline.get("input_transform", "sqrt_zscore"),
-            "obs_noise_scale": float(cfg.baseline.get("obs_noise_scale", 0.1)),
-            **_rate_head_params(cfg.baseline, cfg),
-        }
-        selected_params = _select_best_lds_pca_params(dataset, cfg)
-    else:
-        raise ValueError(
-            f"Unsupported model_type `{cfg.model_type}`. Expected one of "
-            f"['smoothing', 'pca_latent_regression', 'ridge_direct', "
-            f"'lagged_ridge_direct', 'lagged_pca_latent_regression', "
-            f"'lagged_reduced_rank_regression', 'lds_pca_latent_regression']."
-        )
+    reference_params = build_reference_params(spec, cfg)
+    selected_params = _select_best_params(dataset, cfg, spec)
 
     reference_output, reference_metrics = _run_single_eval(
         dataset,
         cfg,
+        spec,
         cfg.train_split,
         cfg.eval_split,
         reference_params,
@@ -676,6 +297,7 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
     selected_output, selected_metrics = _run_single_eval(
         dataset,
         cfg,
+        spec,
         cfg.train_split,
         cfg.eval_split,
         selected_params,
@@ -728,3 +350,13 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
     }
     (out_dir / "run_metadata.json").write_text(json.dumps(repro, indent=2), encoding="utf-8")
     return repro
+
+
+__all__ = [
+    "DEFAULT_OUTPUT_HEAD",
+    "MODEL_REGISTRY",
+    "build_reference_params",
+    "iter_cv_candidates",
+    "run_full_experiment",
+    "set_seeds",
+]
