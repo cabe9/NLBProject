@@ -6,7 +6,7 @@ Short neural history is the single biggest driver of `co-bps` on the NLB'21 `mc_
 
 ## Results at a glance
 
-Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full table: [`results/benchmark_runs/model_comparison.md`](results/benchmark_runs/model_comparison.md). Source `metrics.csv` files: [`results/benchmark_runs/`](results/benchmark_runs/).
+Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full table: [`results/benchmark_runs/model_comparison.md`](results/benchmark_runs/model_comparison.md). Source `metrics.csv` files: [`results/benchmark_runs/`](results/benchmark_runs/). Notebook walkthrough: [nbviewer render](https://nbviewer.org/github/cabe9/NLBProject/blob/master/notebooks/results_walkthrough.ipynb) ([source notebook](notebooks/results_walkthrough.ipynb)).
 
 | Model | Role | co-bps | vel R² |
 |---|---|---:|---:|
@@ -47,7 +47,7 @@ The runner resolves the NWB path from either `data_path` in the config, or from 
 
 ## Start here, not in source
 
-- **[`notebooks/results_walkthrough.ipynb`](notebooks/results_walkthrough.ipynb)** — rendered walkthrough of the comparison table and plots (90-second skim).
+- **[Results walkthrough notebook](https://nbviewer.org/github/cabe9/NLBProject/blob/master/notebooks/results_walkthrough.ipynb)** — rendered walkthrough of the comparison table and plots (90-second skim); source: [`notebooks/results_walkthrough.ipynb`](notebooks/results_walkthrough.ipynb).
 - **[`docs/architecture.md`](docs/architecture.md)** — pipeline diagram and stage-by-stage control flow.
 - **[`docs/models.md`](docs/models.md)** — one-paragraph description of each model family.
 - **[`docs/output_head_postmortem.md`](docs/output_head_postmortem.md)** — how a clipped rate readout silently rewrote the scientific narrative, and how it was fixed.
