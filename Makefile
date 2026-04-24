@@ -1,4 +1,4 @@
-.PHONY: setup test run lock get-data portfolio-artifacts lint format notebook
+.PHONY: setup test run lock get-data portfolio-artifacts lint format notebook typecheck
 
 setup:
 	python -m pip install --upgrade pip
@@ -9,6 +9,9 @@ test:
 
 lint:
 	ruff check .
+
+typecheck:
+	mypy src scripts tests
 
 format:
 	ruff format .

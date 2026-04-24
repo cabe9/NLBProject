@@ -187,7 +187,7 @@ def _run_single_eval(
     params: dict[str, Any],
     include_psth: bool,
     run_name: str,
-) -> tuple[dict[str, np.ndarray], dict[str, float]]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     logger.info("[%s] model_type=%s effective_params=%s", run_name, spec.name, params)
     train_dict = make_train_input_tensors(
         dataset, cfg.dataset_name, trial_split=train_split, save_file=False
@@ -264,7 +264,7 @@ def _select_best_params(
 # -------- top-level driver --------------------------------------------------
 
 
-def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
+def run_full_experiment(cfg: ExperimentConfig) -> dict[str, Any]:
     set_seeds(cfg.seed)
     out_dir = ensure_dir(cfg.output_dir)
     pred_dir = ensure_dir(out_dir / "predictions")
@@ -340,7 +340,7 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, object]:
     write_metrics_csv(rows, out_dir / "metrics.csv")
     write_summary_md(rows, out_dir / "summary.md")
 
-    repro = {
+    repro: dict[str, Any] = {
         "config": cfg.__dict__,
         "baseline_metrics": reference_metrics,
         "improved_metrics": selected_metrics,

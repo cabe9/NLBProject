@@ -31,7 +31,7 @@ import numpy as np
 from nlb_project.config import ExperimentConfig
 from nlb_project.data_contract import resolve_data_path
 from nlb_project.model_registry import get_spec
-from nlb_project.pipeline import _run_single_eval  # type: ignore[import]
+from nlb_project.pipeline import _run_single_eval
 
 logger = logging.getLogger("compare_output_heads")
 
@@ -203,7 +203,7 @@ def main() -> None:
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(message)s")
 
     # Import NWBDataset lazily so --help stays fast.
-    from nlb_tools.nwb_interface import NWBDataset  # type: ignore[import]
+    from nlb_tools.nwb_interface import NWBDataset
 
     dataset_path = resolve_data_path("mc_maze", args.data_path, "*full")
     print(f"Loading NWB dataset from {dataset_path} ...")

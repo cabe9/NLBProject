@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python (supported: 3.10)
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -28,6 +28,9 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
+
+      - name: Type check with mypy
+        run: mypy src scripts tests
 
       - name: Run tests
         run: pytest -q

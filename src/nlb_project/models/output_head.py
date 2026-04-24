@@ -29,7 +29,7 @@ correctly-shaped head. Three modes are supported:
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Literal, cast
 
 import numpy as np
 from sklearn.linear_model import PoissonRegressor, Ridge
@@ -45,11 +45,11 @@ _POISSON_INITIAL_MAX_ITER: int = 500
 _POISSON_ABSOLUTE_MAX_ITER: int = 10000
 
 
-def validate_output_head(head: str) -> str:
+def validate_output_head(head: str) -> OutputHead:
     head_lower = str(head).lower()
     if head_lower not in _VALID_HEADS:
         raise ValueError(f"Unsupported output head `{head}`. Expected one of {_VALID_HEADS}.")
-    return head_lower
+    return cast(OutputHead, head_lower)
 
 
 def _prepare_log_targets(train_counts: np.ndarray, log_offset: float) -> np.ndarray:

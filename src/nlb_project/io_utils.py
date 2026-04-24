@@ -26,7 +26,9 @@ def write_summary_md(rows: list[dict], out_path: str | Path) -> None:
     def _fmt(value: object) -> str:
         if value is None or pd.isna(value):
             return "n/a"
-        return f"{float(value):.4f}"
+        if isinstance(value, (int, float)):
+            return f"{float(value):.4f}"
+        return str(value)
 
     lines = [
         "# NLB MC_Maze Summary",
