@@ -4,6 +4,46 @@
 
 Short neural history is the single biggest driver of `co-bps` on the NLB'21 `mc_maze` dataset in this comparison. A lagged PCA latent regression reaches `co-bps = 0.027` with `vel R² = 0.36`, from a static baseline near zero — all scored under the official `nlb_tools` evaluation path.
 
+## Start here in 10 minutes
+
+If you're new to this repo, run this quick, safe path first:
+
+> Supported Python version: **3.10 only**. Python 3.11+ is not currently supported because `nlb-tools==0.0.4` depends on `pandas<=1.3.4`.
+
+1. Create and activate an environment, then install deps:
+
+```bash
+conda create -n nlb python=3.10 -y
+conda activate nlb
+make setup
+```
+
+2. Run a minimal CI-safe pipeline wiring check (no dataset download):
+
+```bash
+pytest -q tests/test_pipeline_integration.py
+```
+
+3. (Optional, full benchmark run) Fetch data and run the validated experiment:
+
+```bash
+python -m scripts.get_data --dataset mc_maze --out data/raw
+export NLB_DATA_DIR="$(pwd)/data/raw"
+make run
+```
+
+Where outputs appear:
+
+- Test-only integration artifacts are created under a temporary test directory.
+- Full experiment artifacts appear in `results/mc_maze/` (`metrics.csv`, `ablation.csv`, `summary.md`, `run_metadata.json`, and `predictions/*.h5`).
+- Portfolio comparison artifacts live in `results/benchmark_runs/` and can be regenerated with `make portfolio-artifacts`.
+
+What success looks like:
+
+- `pytest` exits with `1 passed` for `tests/test_pipeline_integration.py`.
+- A full run prints reference/selected `co-bps` and writes files under `results/mc_maze/`.
+- `make portfolio-artifacts` finishes with no diff in tracked files when nothing changed scientifically.
+
 ## Results at a glance
 
 Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full table: [`results/benchmark_runs/model_comparison.md`](results/benchmark_runs/model_comparison.md). Source `metrics.csv` files: [`results/benchmark_runs/`](results/benchmark_runs/). Notebook walkthrough: [nbviewer render](https://nbviewer.org/github/cabe9/NLBProject/blob/master/notebooks/results_walkthrough.ipynb) ([source notebook](notebooks/results_walkthrough.ipynb)).

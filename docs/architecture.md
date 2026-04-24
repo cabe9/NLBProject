@@ -11,7 +11,7 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
 
 ## Stage-by-stage
 
-1. **NWB file** — raw benchmark data, one file per session. Resolved from `data_path` in the config, or from `NLB_DATA_DIR` plus a dataset-specific default subpath. See `src/nlb_project/data_paths.py`.
+1. **NWB file** — raw benchmark data, one file per session. Resolved from `data_path` in the config, or from `NLB_DATA_DIR` plus a dataset-specific default subpath. See `src/nlb_project/data_contract.py` (`resolve_data_path`).
 2. **`NWBDataset`** — the official `nlb_tools.nwb_interface.NWBDataset` loader. Handles resampling to the 5 ms NLB bin width and stores spike counts on the dataset.
 3. **Tensors** — `nlb_tools.make_tensors.make_train_input_tensors` / `make_eval_input_tensors` produce the train/held-in and eval/held-out spike-count arrays in the exact shape NLB expects.
 4. **Temporal features** — optional lagged-history construction plus train-only input transforms (`sqrt`, `sqrt_zscore`, etc.) in `src/nlb_project/models/temporal_features.py`. The lag buffer and z-score statistics are fit on train only.
@@ -24,8 +24,21 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
 
 - `scripts/run_experiment.py` is the single CLI entrypoint for a run.
 - It loads a YAML config through `nlb_project.config.load_config`, which is strictly validated against the model registry.
-- `nlb_project.pipeline.run_experiment` dispatches the model via `MODEL_REGISTRY[cfg.model]`, builds the parameter grid from `ModelSpec.sweep_axes`, runs cross-validation, and writes artifacts.
+- `nlb_project.pipeline.run_full_experiment` dispatches the model via the selected `ModelSpec`, builds the parameter grid from `ModelSpec.sweep_axes`, runs cross-validation, and writes artifacts.
 - `scripts/generate_portfolio_artifacts.py` never runs models — it re-reads the tracked `metrics.csv` files and rebuilds comparison CSV / Markdown / SVG deterministically.
+
+## Data/config/run/artifact flow
+
+1. **Config authoring** (`configs/*.yaml`)  
+   A config selects `model_type`, baseline params, and CV sweep grids.
+2. **Config validation** (`src/nlb_project/config.py`)  
+   `load_config()` enforces required keys and rejects unknown keys against `MODEL_REGISTRY`.
+3. **Run execution** (`scripts/run_experiment.py` -> `src/nlb_project/pipeline.py`)  
+   The run resolves data location, loads/resamples NWB data, performs CV model selection, scores with `nlb_tools.evaluation.evaluate`, and saves predictions/metrics.
+4. **Run artifacts** (`results/mc_maze/` by default config)  
+   The run writes `metrics.csv`, `ablation.csv`, `summary.md`, `run_metadata.json`, and prediction HDF5 files.
+5. **Portfolio artifacts** (`scripts/generate_portfolio_artifacts.py`)  
+   A separate reporting pass re-reads committed `metrics.csv` files to regenerate `results/benchmark_runs/model_comparison.csv`, `.md`, `.svg`, plus diagnostics SVG and experiment log.
 
 ## What's intentionally NOT in the pipeline
 
