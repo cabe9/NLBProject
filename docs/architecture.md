@@ -18,7 +18,7 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
 5. **Model** — one model family from `src/nlb_project/models/`, dispatched via the `MODEL_REGISTRY` in `src/nlb_project/model_registry.py`. Each family exports a `fit_predict_*` function that returns held-in + held-out predictions.
 6. **Output head** — a shared rate readout in `src/nlb_project/models/output_head.py`. Default is `log_link` (ridge on `log(count + log_offset)`, exponentiated at inference); `linear` and `poisson_glm` are kept for ablations. Every model reuses the same head so comparisons are apples-to-apples.
 7. **Evaluation** — `nlb_tools.evaluation.evaluate` computes `co-bps`, `vel R2`, and `psth R2` (when available) against the official splits. The repo never reimplements metrics.
-8. **Reporting** — per-run `metrics.csv`, `run_metadata.json`, and optional portfolio artifacts (`model_comparison.csv`/`.md`/`.svg`, `model_diagnostics.svg`, `experiment_log.md`). See `src/nlb_project/reporting.py`.
+8. **Reporting** — per-run `metrics.csv`, `run_metadata.json`, and optional portfolio artifacts (`model_comparison.csv`/`.md`/`.svg`, `model_diagnostics.svg`, `experiment_log.md`). `run_metadata.json` records the config path, git state, Python/package versions, resolved data path, and prediction artifact hashes. See `src/nlb_project/reporting.py` and `src/nlb_project/run_metadata.py`.
 
 ## Control flow
 

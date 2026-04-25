@@ -23,7 +23,7 @@ def main() -> None:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
     cfg = load_config(args.config)
-    result = run_full_experiment(cfg)
+    result = run_full_experiment(cfg, config_path=args.config)
     print("Experiment finished. Key outputs:")
     print(f"- Reference co-bps: {result['baseline_metrics'].get('co-bps')}")
     print(f"- Selected co-bps: {result['improved_metrics'].get('co-bps')}")

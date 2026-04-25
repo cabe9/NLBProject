@@ -39,6 +39,7 @@ from .config import ExperimentConfig
 from .data_contract import resolve_data_path
 from .io_utils import ensure_dir, write_metrics_csv, write_summary_md
 from .model_registry import MODEL_REGISTRY, ModelSpec, get_spec
+from .run_metadata import build_run_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +265,7 @@ def _select_best_params(
 # -------- top-level driver --------------------------------------------------
 
 
-def run_full_experiment(cfg: ExperimentConfig) -> dict[str, Any]:
+def run_full_experiment(cfg: ExperimentConfig, *, config_path: str | None = None) -> dict[str, Any]:
     set_seeds(cfg.seed)
     out_dir = ensure_dir(cfg.output_dir)
     pred_dir = ensure_dir(out_dir / "predictions")
@@ -340,13 +341,27 @@ def run_full_experiment(cfg: ExperimentConfig) -> dict[str, Any]:
     write_metrics_csv(rows, out_dir / "metrics.csv")
     write_summary_md(rows, out_dir / "summary.md")
 
-    repro: dict[str, Any] = {
-        "config": cfg.__dict__,
-        "baseline_metrics": reference_metrics,
-        "improved_metrics": selected_metrics,
-        "baseline_params": reference_params,
-        "improved_params": selected_params,
+    prediction_artifacts = {
+        "baseline_predictions": {
+            "path": str(reference_path),
+            "sha256": reference_hash,
+        },
+        "improved_predictions": {
+            "path": str(selected_path),
+            "sha256": selected_hash,
+        },
     }
+    repro = build_run_metadata(
+        cfg,
+        config_path=config_path,
+        dataset_path=dataset_path,
+        output_dir=out_dir,
+        baseline_metrics=reference_metrics,
+        improved_metrics=selected_metrics,
+        baseline_params=reference_params,
+        improved_params=selected_params,
+        prediction_artifacts=prediction_artifacts,
+    )
     (out_dir / "run_metadata.json").write_text(json.dumps(repro, indent=2), encoding="utf-8")
     return repro
 
