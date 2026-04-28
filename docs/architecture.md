@@ -26,6 +26,7 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
 - It loads a YAML config through `nlb_project.config.load_config`, which is strictly validated against the model registry.
 - `nlb_project.pipeline.run_full_experiment` dispatches the model via the selected `ModelSpec`, builds the parameter grid from `ModelSpec.sweep_axes`, runs cross-validation, and writes artifacts.
 - `scripts/generate_portfolio_artifacts.py` never runs models — it re-reads the tracked `metrics.csv` files and rebuilds comparison CSV / Markdown / SVG deterministically.
+- `scripts/verify_results.py` audits result artifacts without rerunning models. It always checks tracked `metrics.csv` and `model_comparison.csv` files, and verifies local `run_metadata.json` / prediction hashes when those full-run artifacts are present.
 
 ## Data/config/run/artifact flow
 
@@ -37,8 +38,10 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
    The run resolves data location, loads/resamples NWB data, performs CV model selection, scores with `nlb_tools.evaluation.evaluate`, and saves predictions/metrics.
 4. **Run artifacts** (`results/mc_maze/` by default config)  
    The run writes `metrics.csv`, `ablation.csv`, `summary.md`, `run_metadata.json`, and prediction HDF5 files.
-5. **Portfolio artifacts** (`scripts/generate_portfolio_artifacts.py`)  
+5. **Portfolio artifacts** (`scripts/generate_portfolio_artifacts.py`)
    A separate reporting pass re-reads committed `metrics.csv` files to regenerate `results/benchmark_runs/model_comparison.csv`, `.md`, `.svg`, plus diagnostics SVG and experiment log.
+6. **Provenance verification** (`scripts/verify_results.py`)
+   `make verify-results` fails when tracked metrics are malformed, when local metadata disagrees with metrics, or when the generated comparison CSV is stale relative to the reporting manifest. Missing local metadata or prediction files are warnings because those full-run artifacts are ignored by git.
 
 ## What's intentionally NOT in the pipeline
 

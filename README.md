@@ -79,7 +79,7 @@ make run                 # runs the validated lagged PCA experiment; writes resu
 make portfolio-artifacts # rebuilds comparison CSV / Markdown / SVG from tracked metrics
 ```
 
-`make test` / `make lint` / `make format` / `make notebook` for the dev loop. The `get_data` script is pinned to a stable DANDI release for `mc_maze`, not the floating `draft` URL.
+`make test` / `make lint` / `make format` / `make verify-results` / `make notebook` for the dev loop. `make verify-results` checks that tracked metrics and comparison CSVs are internally consistent, and verifies local `run_metadata.json` / prediction hashes when those full-run artifacts are present. The `get_data` script is pinned to a stable DANDI release for `mc_maze`, not the floating `draft` URL.
 
 ### Data layout
 

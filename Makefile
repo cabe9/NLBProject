@@ -1,4 +1,4 @@
-.PHONY: setup test run lock get-data portfolio-artifacts lint format notebook typecheck
+.PHONY: setup test run lock get-data portfolio-artifacts verify-results lint format notebook typecheck
 
 setup:
 	python -m pip install --upgrade pip
@@ -28,6 +28,9 @@ run:
 
 portfolio-artifacts:
 	python -m scripts.generate_portfolio_artifacts
+
+verify-results:
+	python -m scripts.verify_results
 
 lock:
 	pip-compile requirements/requirements.in -o requirements/requirements.lock

@@ -38,6 +38,7 @@ Issues = "https://github.com/cabe9/NLBProject/issues"
 nlb-run-experiment = "scripts.run_experiment:main"
 nlb-get-data = "scripts.get_data:main"
 nlb-generate-portfolio-artifacts = "scripts.generate_portfolio_artifacts:main"
+nlb-verify-results = "scripts.verify_results:main"
 
 [project.optional-dependencies]
 dev = [
