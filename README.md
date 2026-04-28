@@ -35,7 +35,7 @@ make run
 Where outputs appear:
 
 - Test-only integration artifacts are created under a temporary test directory.
-- Full experiment artifacts appear in `results/mc_maze/` (`metrics.csv`, `ablation.csv`, `summary.md`, `run_metadata.json`, and `predictions/*.h5`).
+- Full experiment artifacts appear in `results/mc_maze/` (`metrics.csv`, `ablation.csv`, `summary.md`, `run_metadata.json`, and `predictions/*.h5`). `run_metadata.json` captures the config path, git revision/dirty state, Python/package versions, resolved data path, and prediction file hashes.
 - Portfolio comparison artifacts live in `results/benchmark_runs/` and can be regenerated with `make portfolio-artifacts`.
 
 What success looks like:

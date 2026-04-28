@@ -6,8 +6,10 @@ This verifies config -> run -> artifact wiring without downloading NLB data.
 from __future__ import annotations
 
 import csv
+import json
 import sys
 import types
+from hashlib import sha256
 from pathlib import Path
 
 import numpy as np
@@ -155,6 +157,20 @@ def test_run_full_experiment_writes_expected_artifacts(tmp_path: Path, monkeypat
     assert (out_dir / "predictions" / "improved_predictions.h5").exists()
     assert result["baseline_metrics"]["co-bps"] == 0.02
     assert result["improved_metrics"]["co-bps"] == 0.02
+
+    metadata = json.loads((out_dir / "run_metadata.json").read_text(encoding="utf-8"))
+    expected_prediction_hash = sha256(repr(["mc_maze"]).encode("utf-8")).hexdigest()
+    assert metadata["metadata_schema_version"] == 1
+    assert metadata["config_path"] is None
+    assert metadata["data"]["dataset_name"] == "mc_maze"
+    assert metadata["data"]["resolved_data_path"] == str(tmp_path)
+    assert metadata["runtime"]["python"]["version"]
+    assert metadata["artifacts"]["predictions"]["baseline_predictions"]["sha256"] == (
+        expected_prediction_hash
+    )
+    assert metadata["artifacts"]["predictions"]["improved_predictions"]["sha256"] == (
+        expected_prediction_hash
+    )
 
     with (out_dir / "metrics.csv").open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
