@@ -22,10 +22,11 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
 
 ## Control flow
 
-- `scripts/run_experiment.py` is the single CLI entrypoint for a run.
+- `nlb-run-experiment` is the installed CLI entrypoint for a run; `scripts/run_experiment.py` is a compatibility wrapper.
 - It loads a YAML config through `nlb_project.config.load_config`, which is strictly validated against the model registry.
 - `nlb_project.pipeline.run_full_experiment` dispatches the model via the selected `ModelSpec`, builds the parameter grid from `ModelSpec.sweep_axes`, runs cross-validation, and writes artifacts.
-- `scripts/generate_portfolio_artifacts.py` never runs models — it re-reads the tracked `metrics.csv` files and rebuilds comparison CSV / Markdown / SVG deterministically.
+- `nlb-generate-portfolio-artifacts` never runs models — it re-reads the tracked `metrics.csv` files and rebuilds comparison CSV / Markdown / SVG deterministically.
+- `nlb-verify-results` audits result artifacts without rerunning models. It always checks tracked `metrics.csv` and `model_comparison.csv` files, and verifies local `run_metadata.json` / prediction hashes when those full-run artifacts are present.
 
 ## Data/config/run/artifact flow
 
@@ -33,16 +34,18 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
    A config selects `model_type`, baseline params, and CV sweep grids.
 2. **Config validation** (`src/nlb_project/config.py`)  
    `load_config()` enforces required keys and rejects unknown keys against `MODEL_REGISTRY`.
-3. **Run execution** (`scripts/run_experiment.py` -> `src/nlb_project/pipeline.py`)  
+3. **Run execution** (`nlb-run-experiment` -> `src/nlb_project/pipeline.py`)
    The run resolves data location, loads/resamples NWB data, performs CV model selection, scores with `nlb_tools.evaluation.evaluate`, and saves predictions/metrics.
 4. **Run artifacts** (`results/mc_maze/` by default config)  
    The run writes `metrics.csv`, `ablation.csv`, `summary.md`, `run_metadata.json`, and prediction HDF5 files.
-5. **Portfolio artifacts** (`scripts/generate_portfolio_artifacts.py`)  
+5. **Portfolio artifacts** (`nlb-generate-portfolio-artifacts`)
    A separate reporting pass re-reads committed `metrics.csv` files to regenerate `results/benchmark_runs/model_comparison.csv`, `.md`, `.svg`, plus diagnostics SVG and experiment log.
+6. **Provenance verification** (`nlb-verify-results`)
+   `make verify-results` fails when tracked metrics are malformed, when local metadata disagrees with metrics, or when the generated comparison CSV is stale relative to the reporting manifest. Missing local metadata or prediction files are warnings because those full-run artifacts are ignored by git.
 
 ## What's intentionally NOT in the pipeline
 
 - No benchmark-split logic (handed off entirely to `nlb_tools`).
 - No custom metric implementations.
 - No global data-mutating state; each run writes to its own output directory.
-- No network calls at evaluation time; data is fetched once up front via `scripts/get_data.py`.
+- No network calls at evaluation time; data is fetched once up front via `nlb-get-data`.

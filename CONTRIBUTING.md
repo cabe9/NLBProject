@@ -15,7 +15,8 @@ make setup
 If you want to run full benchmark configs, download data once:
 
 ```bash
-python -m scripts.get_data --dataset mc_maze --out data/raw
+python -m pip install dandi
+nlb-get-data --dataset mc_maze --out data/raw
 export NLB_DATA_DIR="$(pwd)/data/raw"
 ```
 
@@ -65,7 +66,7 @@ The pipeline should stay model-agnostic: avoid adding per-model branches in `src
 - `configs/*.yaml` used for benchmark claims
 - docs or README sections that state headline metrics
 
-Do not hand-edit generated CSV/Markdown/SVG artifacts. Regenerate via scripts/Make targets so provenance stays clear.
+Do not hand-edit generated CSV/Markdown/SVG artifacts. Regenerate via CLI/Make targets so provenance stays clear.
 
 ## Reproducibility expectations
 

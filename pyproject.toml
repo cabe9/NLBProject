@@ -35,9 +35,10 @@ Repository = "https://github.com/cabe9/NLBProject"
 Issues = "https://github.com/cabe9/NLBProject/issues"
 
 [project.scripts]
-nlb-run-experiment = "scripts.run_experiment:main"
-nlb-get-data = "scripts.get_data:main"
-nlb-generate-portfolio-artifacts = "scripts.generate_portfolio_artifacts:main"
+nlb-run-experiment = "nlb_project.cli.run_experiment:main"
+nlb-get-data = "nlb_project.cli.get_data:main"
+nlb-generate-portfolio-artifacts = "nlb_project.cli.generate_portfolio_artifacts:main"
+nlb-verify-results = "nlb_project.cli.verify_results:main"
 
 [project.optional-dependencies]
 dev = [

@@ -1,4 +1,4 @@
-.PHONY: setup test run lock get-data portfolio-artifacts lint format notebook typecheck
+.PHONY: setup test run lock get-data portfolio-artifacts verify-results lint format notebook typecheck
 
 setup:
 	python -m pip install --upgrade pip
@@ -21,13 +21,16 @@ notebook:
 		--output results_walkthrough.ipynb
 
 get-data:
-	python -m scripts.get_data --dataset mc_maze --out data/raw
+	nlb-get-data --dataset mc_maze --out data/raw
 
 run:
-	python -m scripts.run_experiment --config configs/mc_maze_lagged_pca.yaml
+	nlb-run-experiment --config configs/mc_maze_lagged_pca.yaml
 
 portfolio-artifacts:
-	python -m scripts.generate_portfolio_artifacts
+	nlb-generate-portfolio-artifacts
+
+verify-results:
+	nlb-verify-results
 
 lock:
 	pip-compile requirements/requirements.in -o requirements/requirements.lock

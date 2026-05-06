@@ -27,10 +27,12 @@ pytest -q tests/test_pipeline_integration.py
 3. (Optional, full benchmark run) Fetch data and run the validated experiment:
 
 ```bash
-python -m scripts.get_data --dataset mc_maze --out data/raw
+nlb-get-data --dataset mc_maze --out data/raw
 export NLB_DATA_DIR="$(pwd)/data/raw"
 make run
 ```
+
+`nlb-get-data` shells out to the DANDI CLI. If it reports that `dandi` is missing, install that downloader once with `python -m pip install dandi`.
 
 Where outputs appear:
 
@@ -74,12 +76,12 @@ Config: [`configs/mc_maze_lagged_pca.yaml`](configs/mc_maze_lagged_pca.yaml) · 
 ```bash
 conda create -n nlb python=3.10 && conda activate nlb
 make setup
-python -m scripts.get_data --dataset mc_maze --out data/raw && export NLB_DATA_DIR=$(pwd)/data/raw
+nlb-get-data --dataset mc_maze --out data/raw && export NLB_DATA_DIR=$(pwd)/data/raw
 make run                 # runs the validated lagged PCA experiment; writes results/mc_maze/
 make portfolio-artifacts # rebuilds comparison CSV / Markdown / SVG from tracked metrics
 ```
 
-`make test` / `make lint` / `make format` / `make notebook` for the dev loop. The `get_data` script is pinned to a stable DANDI release for `mc_maze`, not the floating `draft` URL.
+`make test` / `make lint` / `make format` / `make verify-results` / `make notebook` for the dev loop. `make verify-results` checks that tracked metrics and comparison CSVs are internally consistent, and verifies local `run_metadata.json` / prediction hashes when those full-run artifacts are present. `nlb-get-data` is pinned to a stable DANDI release for `mc_maze`, not the floating `draft` URL.
 
 ### Data layout
 
@@ -99,8 +101,9 @@ configs/               experiment YAML configs (benchmark suite + the selected c
 docs/                  architecture notes, model descriptions, output-head postmortem
 notebooks/             results_walkthrough.ipynb — rendered comparison
 results/               tracked per-run metrics.csv + portfolio comparison artifacts
-scripts/               run_experiment.py, get_data.py, generate_portfolio_artifacts.py
+scripts/               backward-compatible wrappers for the installed nlb-* commands
 src/nlb_project/
+  cli/                 installed nlb-* command implementations
   config.py            typed, fail-fast config loading
   model_registry.py    declarative ModelSpec entries; single source of truth for sweeps
   pipeline.py          orchestration: load → tensors → fit → head → evaluate → artifacts
