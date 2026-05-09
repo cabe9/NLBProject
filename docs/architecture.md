@@ -27,6 +27,7 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
 - `nlb_project.pipeline.run_full_experiment` dispatches the model via the selected `ModelSpec`, builds the parameter grid from `ModelSpec.sweep_axes`, runs cross-validation, and writes artifacts.
 - `nlb-generate-portfolio-artifacts` never runs models — it re-reads the tracked `metrics.csv` files and rebuilds comparison CSV / Markdown / SVG deterministically.
 - `nlb-verify-results` audits result artifacts without rerunning models. It always checks tracked `metrics.csv` and `model_comparison.csv` files, and verifies local `run_metadata.json` / prediction hashes when those full-run artifacts are present.
+- `nlb-get-public-eval-data` downloads the official public test-target HDF5 from `neurallatents/nlb_tools`; `nlb-evaluate-public-test` selects hyperparameters on train/val, fits the final model on `train + val`, predicts the NLB `test` split, and scores with `nlb_tools.evaluation.evaluate`.
 
 ## Data/config/run/artifact flow
 
@@ -42,6 +43,8 @@ A single experiment run is a straight pipeline: load NWB, build tensors, fit a m
    A separate reporting pass re-reads committed `metrics.csv` files to regenerate `results/benchmark_runs/model_comparison.csv`, `.md`, `.svg`, plus diagnostics SVG and experiment log.
 6. **Provenance verification** (`nlb-verify-results`)
    `make verify-results` fails when tracked metrics are malformed, when local metadata disagrees with metrics, or when the generated comparison CSV is stale relative to the reporting manifest. Missing local metadata or prediction files are warnings because those full-run artifacts are ignored by git.
+7. **Public test evaluation** (`nlb-evaluate-public-test`)
+   The test runner never calls `make_eval_target_tensors` on `test`; it only makes test input tensors, predicts rates, and evaluates them against the public target HDF5 downloaded from the official NLB codepack. Final public-test fits use `train + val` because the public target file's train-side behavior arrays include both splits.
 
 ## What's intentionally NOT in the pipeline
 

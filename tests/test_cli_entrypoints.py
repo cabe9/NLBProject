@@ -9,6 +9,8 @@ def test_installed_cli_modules_import() -> None:
         "nlb_project.cli.get_data",
         "nlb_project.cli.generate_portfolio_artifacts",
         "nlb_project.cli.verify_results",
+        "nlb_project.cli.get_public_eval_data",
+        "nlb_project.cli.evaluate_public_test",
     ]
 
     for module_name in modules:

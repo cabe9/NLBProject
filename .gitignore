@@ -14,6 +14,7 @@ dist/
 
 # Data and generated outputs
 data/raw/
+data/eval/
 results/**/predictions/*.h5
 results/**/run_metadata.json
 results/benchmark_runs/*/*

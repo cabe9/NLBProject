@@ -1,0 +1,3 @@
+model,model_type,split,train_split,model_selection_train_split,model_selection_eval_split,eval_split,co-bps,vel R2,psth R2,fp-bps,params
+baseline,lagged_pca_latent_regression,mc_maze_split,train+val,train,val,test,0.01989396717922621,0.2690245144253586,-26.411677052180238,,"{""history_bins"": 5, ""input_transform"": ""sqrt_zscore"", ""log_offset"": 0.001, ""n_components"": 20, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"
+selected,lagged_pca_latent_regression,mc_maze_split,train+val,train,val,test,0.02676476481992508,0.3677868660208166,-26.408109877260202,,"{""history_bins"": 9, ""input_transform"": ""sqrt_zscore"", ""log_offset"": 0.001, ""n_components"": 20, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"

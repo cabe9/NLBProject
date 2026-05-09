@@ -34,6 +34,20 @@ make run
 
 `nlb-get-data` shells out to the DANDI CLI. If it reports that `dandi` is missing, install that downloader once with `python -m pip install dandi`.
 
+4. (Optional, frozen-leaderboard comparison) Score the selected config against
+   the public NLB test targets:
+
+```bash
+make public-eval-data
+make public-test
+```
+
+This selects hyperparameters on the config's train/val split, then fits the
+final public-test model on `train + val` to match the official target schema.
+It writes local public-test artifacts under `results/public_test/mc_maze/`.
+The target HDF5 is downloaded from the official `neurallatents/nlb_tools`
+repo and verified by SHA-256; it is ignored by git.
+
 Where outputs appear:
 
 - Test-only integration artifacts are created under a temporary test directory.
@@ -81,7 +95,7 @@ make run                 # runs the validated lagged PCA experiment; writes resu
 make portfolio-artifacts # rebuilds comparison CSV / Markdown / SVG from tracked metrics
 ```
 
-`make test` / `make lint` / `make format` / `make verify-results` / `make notebook` for the dev loop. `make verify-results` checks that tracked metrics and comparison CSVs are internally consistent, and verifies local `run_metadata.json` / prediction hashes when those full-run artifacts are present. `nlb-get-data` is pinned to a stable DANDI release for `mc_maze`, not the floating `draft` URL.
+`make test` / `make lint` / `make format` / `make verify-results` / `make notebook` for the dev loop. `make verify-results` checks that tracked metrics and comparison CSVs are internally consistent, and verifies local `run_metadata.json` / prediction hashes when those full-run artifacts are present. `make public-test` is the local analogue of the frozen EvalAI test score. `nlb-get-data` is pinned to a stable DANDI release for `mc_maze`, not the floating `draft` URL.
 
 ### Data layout
 
@@ -107,6 +121,7 @@ src/nlb_project/
   config.py            typed, fail-fast config loading
   model_registry.py    declarative ModelSpec entries; single source of truth for sweeps
   pipeline.py          orchestration: load → tensors → fit → head → evaluate → artifacts
+  public_test.py       local evaluation against the public NLB test target file
   models/              fit_predict_* implementations (one file per family) + output_head
   reporting.py         deterministic rebuild of portfolio comparison artifacts
 tests/                 pytest suite (shape, CV, config, data contract, smoke)
@@ -129,7 +144,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full pipeline.
 - The best validated model is still linear and not yet a dynamical latent model.
 - Lagged reduced-rank regression now finishes within `0.002 co-bps` of lagged PCA but trails on `vel R²` (`0.23` vs `0.36`), which suggests the remaining gap is about latent structure rather than rank.
 
-Most justified next step: a simple linear dynamical latent model or factor-analysis-style temporal latent on the same benchmark path, to test whether the residual gap is about low-rank structure alone or about explicitly modeling latent dynamics over time.
+Most justified next step for a measurable achievement: implement an NDT-style neural sequence model and score it through the public-test harness. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
 
 ## Citation
 
