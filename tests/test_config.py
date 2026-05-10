@@ -117,4 +117,14 @@ def test_ndt_lite_config_loads_without_torch() -> None:
 
     assert cfg.model_type == "ndt_lite"
     assert cfg.baseline["d_model"] == 64
+    assert cfg.baseline["ensemble_size"] == 1
     assert cfg.improvement["d_model_grid"] == [64]
+    assert cfg.improvement["ensemble_size"] == 1
+
+
+def test_ndt_lite_ensemble_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_ensemble.yaml")
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["ensemble_size"] == 1
+    assert cfg.improvement["ensemble_size"] == 3

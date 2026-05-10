@@ -13,11 +13,12 @@ The current reproducible public-test scores:
 |---|---|---:|---:|
 | `MC_Maze 5 ms` public test | lagged PCA latent regression, selected history | 0.0268 | 0.3678 |
 | `MC_Maze 5 ms` public test | NDT-lite temporal transformer | 0.2338 | 0.6412 |
+| `MC_Maze 5 ms` public test | NDT-lite, 3-seed ensemble | 0.2481 | 0.6589 |
 
 The lagged-PCA score is useful as a reproducible floor, not as a competitive
-endpoint. The NDT-lite result is the first measurable neural-sequence baseline:
-about `+0.207 co-bps` absolute over the linear baseline, while still leaving a
-clear gap to old public leaderboard methods.
+endpoint. The NDT-lite ensemble result is the first measurable neural-sequence
+baseline: about `+0.221 co-bps` absolute over the linear baseline, while still
+leaving a clear gap to old public leaderboard methods.
 On the frozen EvalAI `MC_Maze 5 ms` leaderboard, representative co-bps levels are:
 
 | Approximate target | Public method example | co-bps |
@@ -41,12 +42,14 @@ The repo now includes a small Neural Data Transformer-style model:
 - Validation score is selected through the existing train/val machinery.
 - Public-test score is produced by `nlb-evaluate-public-test`, with final fit
   on `train + val`.
+- Optional seed ensembling averages independently initialized NDT-lite models,
+  matching a common pattern in high-scoring leaderboard submissions.
 
-The next practical target is to push this single-model NDT-lite run above
-`0.25 co-bps` without tuning directly on the public test result. After that, a
-serious target is `>0.32 co-bps`, roughly old NDT-class performance. Likely
-useful changes are wider/deeper transformer sweeps, mask-ratio and dropout
-sweeps, a stronger learning-rate schedule, and averaging a small seed ensemble.
+The next practical target is to push this NDT-lite path above `0.25 co-bps`
+without tuning directly on the public test result. After that, a serious target
+is `>0.32 co-bps`, roughly old NDT-class performance. Likely useful changes are
+wider/deeper transformer sweeps, mask-ratio and dropout sweeps, and a stronger
+learning-rate schedule.
 
 Run the initial NDT-lite config with:
 
@@ -55,6 +58,10 @@ python -m pip install -e '.[dev,neural]'
 nlb-evaluate-public-test \
   --config configs/benchmarks/mc_maze_ndt_lite.yaml \
   --output-dir results/public_test/mc_maze_ndt_lite
+
+nlb-evaluate-public-test \
+  --config configs/benchmarks/mc_maze_ndt_lite_ensemble.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite_ensemble
 ```
 
 ## Why not keep tuning the current model?

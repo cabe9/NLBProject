@@ -50,6 +50,6 @@ improvement:
   validation_fraction: 0.1
   input_transform: sqrt_zscore
   seed: 0
-  ensemble_size: 1
+  ensemble_size: 3
   device: auto
-output_dir: results/benchmark_runs/ndt_lite
+output_dir: results/benchmark_runs/ndt_lite_ensemble

@@ -196,6 +196,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             ("validation_fraction", float),
             ("input_transform", str),
             ("seed", int),
+            ("ensemble_size", int),
             ("device", str),
         ),
         sweep_axes=(
@@ -215,6 +216,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             ("validation_fraction", float),
             ("input_transform", str),
             ("seed", int),
+            ("ensemble_size", int),
             ("device", str),
         ),
         uses_rate_head=False,

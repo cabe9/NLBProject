@@ -76,6 +76,7 @@ def fit_predict_ndt_lite(
     validation_fraction: float,
     input_transform: str,
     seed: int,
+    ensemble_size: int = 1,
     device: str = "auto",
     min_rate: float = 1e-6,
     grad_clip_norm: float = 1.0,
@@ -89,9 +90,10 @@ def fit_predict_ndt_lite(
         raise ValueError("`mask_prob` must be in [0, 1)")
     if not 0.0 <= validation_fraction < 1.0:
         raise ValueError("`validation_fraction` must be in [0, 1)")
+    ensemble_size = int(ensemble_size)
+    if ensemble_size < 1:
+        raise ValueError("`ensemble_size` must be at least 1")
 
-    torch.manual_seed(int(seed))
-    rng = np.random.default_rng(int(seed))
     train_hi = np.asarray(train_spikes_heldin, dtype=np.float32)
     train_ho = np.asarray(train_spikes_heldout, dtype=np.float32)
     eval_hi = np.asarray(eval_spikes_heldin, dtype=np.float32)
@@ -128,104 +130,121 @@ def fit_predict_ndt_lite(
             heldout = functional.softplus(self.heldout_head(h)) + float(min_rate)
             return heldin, heldout
 
-    model = TemporalTransformer().to(device_obj)
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=float(learning_rate), weight_decay=float(weight_decay)
-    )
-
     x_train = torch.as_tensor(train_x, dtype=torch.float32, device=device_obj)
     y_hi = torch.as_tensor(train_hi, dtype=torch.float32, device=device_obj)
     y_ho = torch.as_tensor(train_ho, dtype=torch.float32, device=device_obj)
 
-    indices = np.arange(n_train)
-    rng.shuffle(indices)
-    n_val = int(round(n_train * float(validation_fraction)))
-    val_idx = indices[:n_val]
-    fit_idx = indices[n_val:] if n_val > 0 else indices
-    if len(fit_idx) == 0:
-        fit_idx = indices
-        val_idx = np.array([], dtype=int)
+    def fit_one(seed_value: int) -> dict[str, np.ndarray]:
+        torch.manual_seed(int(seed_value))
+        rng = np.random.default_rng(int(seed_value))
+        model = TemporalTransformer().to(device_obj)
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=float(learning_rate), weight_decay=float(weight_decay)
+        )
 
-    best_state = {
-        name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()
-    }
-    best_val = float("inf")
-    epochs_without_improvement = 0
+        indices = np.arange(n_train)
+        rng.shuffle(indices)
+        n_val = int(round(n_train * float(validation_fraction)))
+        val_idx = indices[:n_val]
+        fit_idx = indices[n_val:] if n_val > 0 else indices
+        if len(fit_idx) == 0:
+            fit_idx = indices
+            val_idx = np.array([], dtype=int)
 
-    def batch_loss(batch_idx: np.ndarray, *, train_mode: bool) -> Any:
-        xb = x_train[batch_idx]
-        target_hi = y_hi[batch_idx]
-        target_ho = y_ho[batch_idx]
-        if train_mode and mask_prob > 0:
-            mask = torch.rand_like(xb) < float(mask_prob)
-            xb = xb.masked_fill(mask, 0.0)
-        else:
-            mask = torch.ones_like(xb, dtype=torch.bool)
-        pred_hi, pred_ho = model(xb)
-        loss = _poisson_loss(functional, pred_ho, target_ho)
-        if heldin_loss_weight > 0:
-            if bool(mask.any()):
-                loss_hi = _poisson_loss(functional, pred_hi[mask], target_hi[mask])
+        best_state = {
+            name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()
+        }
+        best_val = float("inf")
+        epochs_without_improvement = 0
+
+        def batch_loss(batch_idx: np.ndarray, *, train_mode: bool) -> Any:
+            idx_tensor = torch.as_tensor(batch_idx, dtype=torch.long, device=device_obj)
+            xb = x_train.index_select(0, idx_tensor)
+            target_hi = y_hi.index_select(0, idx_tensor)
+            target_ho = y_ho.index_select(0, idx_tensor)
+            if train_mode and mask_prob > 0:
+                mask = torch.rand_like(xb) < float(mask_prob)
+                xb = xb.masked_fill(mask, 0.0)
             else:
-                loss_hi = _poisson_loss(functional, pred_hi, target_hi)
-            loss = loss + float(heldin_loss_weight) * loss_hi
-        return loss
+                mask = torch.ones_like(xb, dtype=torch.bool)
+            pred_hi, pred_ho = model(xb)
+            loss = _poisson_loss(functional, pred_ho, target_ho)
+            if heldin_loss_weight > 0:
+                if bool(mask.any()):
+                    loss_hi = _poisson_loss(functional, pred_hi[mask], target_hi[mask])
+                else:
+                    loss_hi = _poisson_loss(functional, pred_hi, target_hi)
+                loss = loss + float(heldin_loss_weight) * loss_hi
+            return loss
 
-    for _epoch in range(int(max_epochs)):
-        rng.shuffle(fit_idx)
-        model.train()
-        for start in range(0, len(fit_idx), batch_size):
-            batch_idx = fit_idx[start : start + batch_size]
-            optimizer.zero_grad(set_to_none=True)
-            loss = batch_loss(batch_idx, train_mode=True)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip_norm))
-            optimizer.step()
+        for _epoch in range(int(max_epochs)):
+            rng.shuffle(fit_idx)
+            model.train()
+            for start in range(0, len(fit_idx), batch_size):
+                batch_idx = fit_idx[start : start + batch_size]
+                optimizer.zero_grad(set_to_none=True)
+                loss = batch_loss(batch_idx, train_mode=True)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip_norm))
+                optimizer.step()
 
-        model.eval()
-        with torch.no_grad():
-            if len(val_idx) > 0:
-                val_losses = []
-                for start in range(0, len(val_idx), batch_size):
-                    batch_idx = val_idx[start : start + batch_size]
-                    val_losses.append(float(batch_loss(batch_idx, train_mode=False).detach().cpu()))
-                val_loss = float(np.mean(val_losses))
+            model.eval()
+            with torch.no_grad():
+                if len(val_idx) > 0:
+                    val_losses = []
+                    for start in range(0, len(val_idx), batch_size):
+                        batch_idx = val_idx[start : start + batch_size]
+                        val_losses.append(
+                            float(batch_loss(batch_idx, train_mode=False).detach().cpu())
+                        )
+                    val_loss = float(np.mean(val_losses))
+                else:
+                    val_loss = float(
+                        batch_loss(fit_idx[: min(len(fit_idx), batch_size)], train_mode=False)
+                        .detach()
+                        .cpu()
+                    )
+
+            if val_loss < best_val - 1e-5:
+                best_val = val_loss
+                best_state = {
+                    name: tensor.detach().cpu().clone()
+                    for name, tensor in model.state_dict().items()
+                }
+                epochs_without_improvement = 0
             else:
-                val_loss = float(
-                    batch_loss(fit_idx[: min(len(fit_idx), batch_size)], train_mode=False)
-                )
+                epochs_without_improvement += 1
+                if epochs_without_improvement >= int(patience):
+                    break
 
-        if val_loss < best_val - 1e-5:
-            best_val = val_loss
-            best_state = {
-                name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()
-            }
-            epochs_without_improvement = 0
-        else:
-            epochs_without_improvement += 1
-            if epochs_without_improvement >= int(patience):
-                break
+        model.load_state_dict({name: tensor.to(device_obj) for name, tensor in best_state.items()})
 
-    model.load_state_dict({name: tensor.to(device_obj) for name, tensor in best_state.items()})
+        def predict_rates(x_np: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            x_tensor = torch.as_tensor(x_np, dtype=torch.float32, device=device_obj)
+            heldin_batches: list[np.ndarray] = []
+            heldout_batches: list[np.ndarray] = []
+            model.eval()
+            with torch.no_grad():
+                for start in range(0, x_tensor.shape[0], batch_size):
+                    xb = x_tensor[start : start + batch_size]
+                    pred_hi, pred_ho = model(xb)
+                    heldin_batches.append(pred_hi.detach().cpu().numpy().astype(np.float32))
+                    heldout_batches.append(pred_ho.detach().cpu().numpy().astype(np.float32))
+            return np.concatenate(heldin_batches, axis=0), np.concatenate(heldout_batches, axis=0)
 
-    def predict_rates(x_np: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x_tensor = torch.as_tensor(x_np, dtype=torch.float32, device=device_obj)
-        heldin_batches: list[np.ndarray] = []
-        heldout_batches: list[np.ndarray] = []
-        model.eval()
-        with torch.no_grad():
-            for start in range(0, x_tensor.shape[0], batch_size):
-                xb = x_tensor[start : start + batch_size]
-                pred_hi, pred_ho = model(xb)
-                heldin_batches.append(pred_hi.detach().cpu().numpy().astype(np.float32))
-                heldout_batches.append(pred_ho.detach().cpu().numpy().astype(np.float32))
-        return np.concatenate(heldin_batches, axis=0), np.concatenate(heldout_batches, axis=0)
+        train_rates_heldin, train_rates_heldout = predict_rates(train_x)
+        eval_rates_heldin, eval_rates_heldout = predict_rates(eval_x)
+        return {
+            "train_rates_heldin": train_rates_heldin,
+            "train_rates_heldout": train_rates_heldout,
+            "eval_rates_heldin": eval_rates_heldin,
+            "eval_rates_heldout": eval_rates_heldout,
+        }
 
-    train_rates_heldin, train_rates_heldout = predict_rates(train_x)
-    eval_rates_heldin, eval_rates_heldout = predict_rates(eval_x)
+    member_outputs = [fit_one(int(seed) + member_idx) for member_idx in range(ensemble_size)]
+    if ensemble_size == 1:
+        return member_outputs[0]
     return {
-        "train_rates_heldin": train_rates_heldin,
-        "train_rates_heldout": train_rates_heldout,
-        "eval_rates_heldin": eval_rates_heldin,
-        "eval_rates_heldout": eval_rates_heldout,
+        key: np.mean([member[key] for member in member_outputs], axis=0).astype(np.float32)
+        for key in member_outputs[0]
     }

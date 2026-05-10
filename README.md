@@ -1,8 +1,8 @@
-# Neural Latents Benchmark (`mc_maze`) — lagged PCA beats static baselines
+# Neural Latents Benchmark (`mc_maze`) — reproducible public-test neural baseline
 
 [![CI](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml/badge.svg)](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml)
 
-Short neural history is the single biggest driver of `co-bps` on the NLB'21 `mc_maze` dataset in this comparison. A lagged PCA latent regression reaches `co-bps = 0.027` with `vel R² = 0.36`, from a static baseline near zero — all scored under the official `nlb_tools` evaluation path.
+This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The linear baseline shows why short neural history matters; the NDT-lite transformer path now reaches `0.2481 co-bps` on the local public-test target with a 3-seed ensemble, all scored through the official `nlb_tools` evaluation code.
 
 ## Start here in 10 minutes
 
@@ -48,6 +48,16 @@ It writes local public-test artifacts under `results/public_test/mc_maze/`.
 The target HDF5 is downloaded from the official `neurallatents/nlb_tools`
 repo and verified by SHA-256; it is ignored by git.
 
+For the neural public-test baseline, install the optional PyTorch dependency
+and run:
+
+```bash
+python -m pip install -e '.[dev,neural]'
+nlb-evaluate-public-test \
+  --config configs/benchmarks/mc_maze_ndt_lite_ensemble.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite_ensemble
+```
+
 Where outputs appear:
 
 - Test-only integration artifacts are created under a temporary test directory.
@@ -74,6 +84,16 @@ Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full 
 | **lagged PCA latent regression (selected history)** | **headline** | **0.0266** | **0.3648** |
 
 ![co-bps comparison](results/benchmark_runs/model_comparison.svg)
+
+### Public-test score
+
+Local evaluation against the public NLB test target HDF5:
+
+| Model | co-bps | vel R² | psth R² |
+|---|---:|---:|---:|
+| lagged PCA latent regression, selected history | 0.0268 | 0.3678 | -26.4081 |
+| NDT-lite temporal transformer | 0.2338 | 0.6412 | 0.3397 |
+| **NDT-lite, 3-seed ensemble** | **0.2481** | **0.6589** | **0.4086** |
 
 **Takeaways**
 
@@ -141,10 +161,10 @@ See [`docs/architecture.md`](docs/architecture.md) for the full pipeline.
 ## Limitations and next step
 
 - Only one dataset (`mc_maze`) is fully packaged here; the comparison set is intentionally small.
-- The best validated model is still linear and not yet a dynamical latent model.
-- Lagged reduced-rank regression now finishes within `0.002 co-bps` of lagged PCA but trails on `vel R²` (`0.23` vs `0.36`), which suggests the remaining gap is about latent structure rather than rank.
+- The neural path is still a compact NDT-style baseline, not a full reproduction of the strongest NLB leaderboard systems.
+- The public-test target is local and reproducible because EvalAI submissions are closed; it should be treated as a frozen benchmark artifact, not a live leaderboard submission.
 
-Most justified next step for a measurable achievement: implement an NDT-style neural sequence model and score it through the public-test harness. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
+Most justified next step for a measurable achievement: push the NDT-lite path above `0.25 co-bps` through validation-led tuning, then work toward old NDT-class `>0.32 co-bps`. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
 
 ## Citation
 
