@@ -11,10 +11,12 @@ All models share the same data path (NWB → tensors) and the same rate readout 
 | `lagged_pca_latent_regression` | `models/lagged_pca_latent_regression.py` | Lag the held-in counts, compress with PCA on the lagged feature matrix, then ridge-regress. Strongest validated model in this repo. |
 | `lagged_reduced_rank_regression` | `models/lagged_reduced_rank_regression.py` | Supervised low-rank analogue of lagged PCA — ridge regression with a rank constraint on the coefficient matrix. Control for "is the PCA bottleneck doing real work?". |
 | `lds_pca_latent_regression` | `models/lds_pca_latent_regression.py` | PCA latent fit jointly with a linear dynamical system (Kalman + RTS smoother) over time, then ridge to held-out neurons. Exploratory; compares against the non-dynamical lagged baseline. |
+| `ndt_lite` | `models/ndt_lite.py` | Small PyTorch temporal transformer over held-in spike counts with random held-in masking and Poisson rate losses. First neural-sequence baseline toward NDT/STNDT-class methods. |
 
 ## Design principles
 
 - **One `fit_predict_*` per family.** Every model exposes a single callable that takes the built tensors and returns held-in + held-out rate predictions. No hidden state across calls.
 - **Train-only preprocessing.** Any scaling / PCA basis / lag-buffer initial values are fit on train data only, then applied frozen to eval tensors. This is enforced in `models/temporal_features.py`.
 - **Shared rate readout.** None of the models implement their own rate conversion; they all route predictions through `models/output_head.py`. This is what makes the cross-model comparison fair (see `docs/output_head_postmortem.md` for why this matters).
+- **Neural baselines stay optional.** `ndt_lite` requires PyTorch and is installed with `pip install -e .[neural]`; the default linear/reproducibility path remains lightweight.
 - **Declarative registration.** Each family is registered in `src/nlb_project/model_registry.py` with its parameter names, sweep axes, and CV defaults. Adding a new family means writing the model file and appending one `ModelSpec` entry.

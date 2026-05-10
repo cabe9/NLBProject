@@ -110,3 +110,11 @@ def test_unknown_model_type_rejected(tmp_path: Path) -> None:
     path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     with pytest.raises(ValueError, match="model_type"):
         load_config(path)
+
+
+def test_ndt_lite_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite.yaml")
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["d_model"] == 64
+    assert cfg.improvement["d_model_grid"] == [64]

@@ -30,7 +30,7 @@ a reproducible local public-test score, not a new public leaderboard rank.
 
 The next useful model is a small Neural Data Transformer-style model:
 
-- PyTorch model registered as a normal `model_type`.
+- PyTorch model registered as a normal `model_type` (`ndt_lite`).
 - Inputs are held-in spike counts plus optional time-bin and neuron embeddings.
 - Training objective is masked Poisson negative log likelihood on observed
   train-side neurons.
@@ -42,6 +42,13 @@ First target: exceed `0.25 co-bps` on `MC_Maze 5 ms` public test. That would
 show the repo has crossed from linear baselines into neural sequence-model
 territory. After that, a serious target is `>0.32 co-bps`, roughly old NDT
 class performance.
+
+Run the initial NDT-lite config with:
+
+```bash
+python -m pip install -e '.[dev,neural]'
+nlb-evaluate-public-test --config configs/benchmarks/mc_maze_ndt_lite.yaml
+```
 
 ## Why not keep tuning the current model?
 
