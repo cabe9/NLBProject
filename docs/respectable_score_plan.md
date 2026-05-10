@@ -7,13 +7,17 @@ make public-eval-data
 make public-test
 ```
 
-The current selected lagged-PCA baseline scores:
+The current reproducible public-test scores:
 
 | dataset split | model | co-bps | vel R2 |
 |---|---|---:|---:|
 | `MC_Maze 5 ms` public test | lagged PCA latent regression, selected history | 0.0268 | 0.3678 |
+| `MC_Maze 5 ms` public test | NDT-lite temporal transformer | 0.2338 | 0.6412 |
 
-That number is useful as a reproducible floor, not as a competitive endpoint.
+The lagged-PCA score is useful as a reproducible floor, not as a competitive
+endpoint. The NDT-lite result is the first measurable neural-sequence baseline:
+about `+0.207 co-bps` absolute over the linear baseline, while still leaving a
+clear gap to old public leaderboard methods.
 On the frozen EvalAI `MC_Maze 5 ms` leaderboard, representative co-bps levels are:
 
 | Approximate target | Public method example | co-bps |
@@ -26,28 +30,31 @@ On the frozen EvalAI `MC_Maze 5 ms` leaderboard, representative co-bps levels ar
 EvalAI no longer accepts new submissions, so the achievement target should be
 a reproducible local public-test score, not a new public leaderboard rank.
 
-## Next implementation target: NDT-lite
+## Current neural baseline: NDT-lite
 
-The next useful model is a small Neural Data Transformer-style model:
+The repo now includes a small Neural Data Transformer-style model:
 
 - PyTorch model registered as a normal `model_type` (`ndt_lite`).
-- Inputs are held-in spike counts plus optional time-bin and neuron embeddings.
+- Inputs are held-in spike counts with learned temporal embeddings.
 - Training objective is masked Poisson negative log likelihood on observed
   train-side neurons.
 - Validation score is selected through the existing train/val machinery.
-- Public-test score is produced by `make public-test`, with final fit on
-  `train + val`.
+- Public-test score is produced by `nlb-evaluate-public-test`, with final fit
+  on `train + val`.
 
-First target: exceed `0.25 co-bps` on `MC_Maze 5 ms` public test. That would
-show the repo has crossed from linear baselines into neural sequence-model
-territory. After that, a serious target is `>0.32 co-bps`, roughly old NDT
-class performance.
+The next practical target is to push this single-model NDT-lite run above
+`0.25 co-bps` without tuning directly on the public test result. After that, a
+serious target is `>0.32 co-bps`, roughly old NDT-class performance. Likely
+useful changes are wider/deeper transformer sweeps, mask-ratio and dropout
+sweeps, a stronger learning-rate schedule, and averaging a small seed ensemble.
 
 Run the initial NDT-lite config with:
 
 ```bash
 python -m pip install -e '.[dev,neural]'
-nlb-evaluate-public-test --config configs/benchmarks/mc_maze_ndt_lite.yaml
+nlb-evaluate-public-test \
+  --config configs/benchmarks/mc_maze_ndt_lite.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite
 ```
 
 ## Why not keep tuning the current model?

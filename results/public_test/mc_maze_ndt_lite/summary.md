@@ -1,0 +1,8 @@
+# NLB Public Test Summary
+
+Evaluated locally against the public NLB test target HDF5.
+
+| run | split | co-bps | vel R2 | psth R2 | fp-bps | params |
+|---|---|---:|---:|---:|---:|---|
+| baseline | mc_maze_split | 0.2338 | 0.6412 | 0.3397 | n/a | {"batch_size": 64, "d_model": 64, "device": "auto", "dropout": 0.1, "heldin_loss_weight": 0.2, "input_transform": "sqrt_zscore", "learning_rate": 0.001, "mask_prob": 0.2, "max_epochs": 40, "n_heads": 4, "n_layers": 2, "patience": 6, "seed": 0, "validation_fraction": 0.1, "weight_decay": 0.0001} |
+| selected | mc_maze_split | 0.2338 | 0.6412 | 0.3397 | n/a | {"batch_size": 64, "d_model": 64, "device": "auto", "dropout": 0.1, "heldin_loss_weight": 0.2, "input_transform": "sqrt_zscore", "learning_rate": 0.001, "mask_prob": 0.2, "max_epochs": 40, "n_heads": 4, "n_layers": 2, "patience": 6, "seed": 0, "validation_fraction": 0.1, "weight_decay": 0.0001} |
