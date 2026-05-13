@@ -128,3 +128,19 @@ def test_ndt_lite_ensemble_config_loads_without_torch() -> None:
     assert cfg.model_type == "ndt_lite"
     assert cfg.baseline["ensemble_size"] == 1
     assert cfg.improvement["ensemble_size"] == 3
+
+
+def test_ndt_lite_width_sweep_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_width_sweep.yaml")
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.improvement["d_model_grid"] == [64, 128]
+    assert cfg.improvement["ensemble_size"] == 1
+
+
+def test_ndt_lite_width_ensemble_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_width_ensemble.yaml")
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.improvement["d_model_grid"] == [128]
+    assert cfg.improvement["ensemble_size"] == 3
