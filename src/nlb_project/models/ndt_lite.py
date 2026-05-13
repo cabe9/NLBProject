@@ -120,6 +120,7 @@ def fit_predict_ndt_lite(
     validation_fraction: float,
     input_transform: str,
     seed: int,
+    lr_schedule: str = "constant",
     ensemble_size: int = 1,
     device: str = "auto",
     min_rate: float = 1e-6,
@@ -137,6 +138,9 @@ def fit_predict_ndt_lite(
     ensemble_size = int(ensemble_size)
     if ensemble_size < 1:
         raise ValueError("`ensemble_size` must be at least 1")
+    lr_schedule = str(lr_schedule).lower()
+    if lr_schedule not in {"constant", "cosine"}:
+        raise ValueError("`lr_schedule` must be one of {'constant', 'cosine'}")
 
     train_hi = np.asarray(train_spikes_heldin, dtype=np.float32)
     train_ho = np.asarray(train_spikes_heldout, dtype=np.float32)
@@ -174,6 +178,13 @@ def fit_predict_ndt_lite(
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=float(learning_rate), weight_decay=float(weight_decay)
         )
+        scheduler = None
+        if lr_schedule == "cosine":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=max(1, int(max_epochs)),
+                eta_min=float(learning_rate) * 0.1,
+            )
 
         indices = np.arange(n_train)
         rng.shuffle(indices)
@@ -220,6 +231,8 @@ def fit_predict_ndt_lite(
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), float(grad_clip_norm))
                 optimizer.step()
+            if scheduler is not None:
+                scheduler.step()
 
             model.eval()
             with torch.no_grad():

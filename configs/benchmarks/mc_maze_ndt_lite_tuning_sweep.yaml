@@ -18,7 +18,7 @@ skip_fields:
   - joint_ang
   - force
 baseline:
-  d_model: 64
+  d_model: 128
   n_layers: 2
   n_heads: 4
   dropout: 0.1
@@ -37,13 +37,13 @@ baseline:
   device: auto
 improvement:
   cv_folds: 2
-  d_model_grid: [64]
-  n_layers_grid: [2]
-  dropout_grid: [0.1]
+  d_model_grid: [128]
+  n_layers_grid: [2, 3]
+  dropout_grid: [0.0, 0.1]
   learning_rate_grid: [0.001]
-  mask_prob_grid: [0.2]
+  mask_prob_grid: [0.1, 0.2]
+  lr_schedule_grid: [constant, cosine]
   n_heads: 4
-  lr_schedule_grid: [constant]
   weight_decay: 0.0001
   batch_size: 64
   max_epochs: 40
@@ -54,4 +54,4 @@ improvement:
   seed: 0
   ensemble_size: 1
   device: auto
-output_dir: results/benchmark_runs/ndt_lite
+output_dir: results/benchmark_runs/ndt_lite_tuning_sweep

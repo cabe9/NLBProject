@@ -149,6 +149,36 @@ def test_ndt_lite_invalid_ensemble_size_raises() -> None:
         )
 
 
+def test_ndt_lite_invalid_lr_schedule_raises() -> None:
+    rng = np.random.default_rng(96)
+    train_hi = rng.poisson(0.5, (3, 6, 4)).astype(np.float32)
+    train_ho = rng.poisson(0.4, (3, 6, 2)).astype(np.float32)
+    eval_hi = rng.poisson(0.5, (1, 6, 4)).astype(np.float32)
+
+    with pytest.raises(ValueError, match="lr_schedule"):
+        fit_predict_ndt_lite(
+            train_hi,
+            train_ho,
+            eval_hi,
+            d_model=8,
+            n_layers=1,
+            n_heads=2,
+            dropout=0.0,
+            learning_rate=0.003,
+            weight_decay=0.0,
+            batch_size=2,
+            max_epochs=1,
+            patience=1,
+            mask_prob=0.0,
+            heldin_loss_weight=0.0,
+            validation_fraction=0.0,
+            input_transform="sqrt_zscore",
+            seed=0,
+            lr_schedule="not_a_schedule",
+            device="cpu",
+        )
+
+
 def test_ndt_lite_ensemble_matches_mean_of_single_seed_runs() -> None:
     """Members use seeds ``seed``, ``seed+1``, …; ensemble output averages their rates."""
     rng = np.random.default_rng(94)

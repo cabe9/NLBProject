@@ -48,11 +48,17 @@ The repo now includes a small Neural Data Transformer-style model:
 - A validation-led width sweep selected `d_model=128` over the initial
   `d_model=64`, improving train/val co-bps from `0.1934` to `0.2481` before
   public-test scoring.
+- A first bounded depth/dropout/mask/scheduler sweep did **not** improve the
+  final train/val result: the selected no-dropout model scored `0.2320 co-bps`
+  versus the `0.2481` width reference, so it should not be promoted to
+  public-test scoring.
 
 The next practical target is `>0.32 co-bps`, roughly old NDT-class performance,
 without tuning directly on the public test result. Likely useful changes are
-depth and dropout sweeps around `d_model=128`, mask-ratio sweeps, and a stronger
-learning-rate schedule.
+seed-ensemble sizing, better validation stability, and then neuron-aware spatial
+modeling. Do not spend more public-test runs on the first depth/dropout/cosine
+schedule sweep unless a later train/val run beats the `0.2481` single-model
+width reference.
 
 Run the initial NDT-lite config with:
 
@@ -72,6 +78,9 @@ nlb-run-experiment \
 nlb-evaluate-public-test \
   --config configs/benchmarks/mc_maze_ndt_lite_width_ensemble.yaml \
   --output-dir results/public_test/mc_maze_ndt_lite_width_ensemble
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_ndt_lite_tuning_sweep.yaml
 ```
 
 ### Bounded experiment brief (tooling / lighter models)
