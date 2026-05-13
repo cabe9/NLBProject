@@ -5,7 +5,12 @@ from typing import Any
 import numpy as np
 import pytest
 
-from nlb_project.models.ndt_lite import fit_predict_ndt_lite
+from nlb_project.models.ndt_lite import (
+    _poisson_loss,
+    _require_torch,
+    _temporal_transformer_cls,
+    fit_predict_ndt_lite,
+)
 
 pytest.importorskip("torch")
 
@@ -78,6 +83,38 @@ def test_ndt_lite_seed_ensemble_shapes_and_positive_rates() -> None:
     assert out["eval_rates_heldin"].shape == eval_hi.shape
     assert out["eval_rates_heldout"].shape == (2, 8, 2)
     assert np.all(out["eval_rates_heldout"] > 0.0)
+
+
+def test_ndt_lite_poisson_loss_is_finite_on_synthetic_batch() -> None:
+    torch, nn, functional = _require_torch()
+    torch.manual_seed(95)
+    model_cls = _temporal_transformer_cls(
+        nn,
+        functional,
+        torch,
+        n_heldin=4,
+        n_heldout=2,
+        d_model=8,
+        max_t_len=6,
+        n_layers=1,
+        n_heads=2,
+        dropout=0.0,
+        min_rate=1e-6,
+    )
+    model = model_cls()
+    x = torch.randn(3, 6, 4)
+    target_hi = torch.poisson(torch.full((3, 6, 4), 0.5))
+    target_ho = torch.poisson(torch.full((3, 6, 2), 0.4))
+
+    pred_hi, pred_ho = model(x)
+    loss = _poisson_loss(functional, pred_ho, target_ho)
+    loss = loss + 0.1 * _poisson_loss(functional, pred_hi, target_hi)
+    loss.backward()
+
+    grads = [p.grad for p in model.parameters() if p.grad is not None]
+    assert bool(torch.isfinite(loss))
+    assert grads
+    assert all(bool(torch.isfinite(grad).all()) for grad in grads)
 
 
 def test_ndt_lite_invalid_ensemble_size_raises() -> None:
