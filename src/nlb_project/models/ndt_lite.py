@@ -70,6 +70,7 @@ def _temporal_transformer_cls(
     n_heads: int,
     dropout: float,
     min_rate: float,
+    neuron_embedding_scale: float,
 ) -> type:
     """Return ``nn.Module`` subclass; defined after Torch import so it stays optional."""
 
@@ -77,6 +78,7 @@ def _temporal_transformer_cls(
         def __init__(self) -> None:
             super().__init__()
             self.input_proj = nn.Linear(n_heldin, d_model)
+            self.neuron_event_embed = nn.Parameter(torch.empty(n_heldin, d_model))
             self.pos_embed = nn.Parameter(torch.zeros(1, max_t_len, d_model))
             layer = nn.TransformerEncoderLayer(
                 d_model=d_model,
@@ -90,9 +92,15 @@ def _temporal_transformer_cls(
             self.encoder = nn.TransformerEncoder(layer, num_layers=n_layers)
             self.heldin_head = nn.Linear(d_model, n_heldin)
             self.heldout_head = nn.Linear(d_model, n_heldout)
+            nn.init.normal_(self.neuron_event_embed, mean=0.0, std=0.02)
 
-        def forward(self, x):
+        def forward(self, x, raw_counts=None):
             h = self.input_proj(x) + self.pos_embed[:, : x.shape[1], :]
+            if neuron_embedding_scale > 0:
+                if raw_counts is None:
+                    raw_counts = x
+                events = (raw_counts > 0).to(dtype=x.dtype)
+                h = h + float(neuron_embedding_scale) * (events @ self.neuron_event_embed)
             h = self.encoder(h)
             heldin = functional.softplus(self.heldin_head(h)) + float(min_rate)
             heldout = functional.softplus(self.heldout_head(h)) + float(min_rate)
@@ -121,6 +129,7 @@ def fit_predict_ndt_lite(
     input_transform: str,
     seed: int,
     lr_schedule: str = "constant",
+    neuron_embedding_scale: float = 0.0,
     ensemble_size: int = 1,
     device: str = "auto",
     min_rate: float = 1e-6,
@@ -141,6 +150,9 @@ def fit_predict_ndt_lite(
     lr_schedule = str(lr_schedule).lower()
     if lr_schedule not in {"constant", "cosine"}:
         raise ValueError("`lr_schedule` must be one of {'constant', 'cosine'}")
+    neuron_embedding_scale = float(neuron_embedding_scale)
+    if neuron_embedding_scale < 0:
+        raise ValueError("`neuron_embedding_scale` must be non-negative")
 
     train_hi = np.asarray(train_spikes_heldin, dtype=np.float32)
     train_ho = np.asarray(train_spikes_heldout, dtype=np.float32)
@@ -165,6 +177,7 @@ def fit_predict_ndt_lite(
         n_heads=n_heads,
         dropout=float(dropout),
         min_rate=float(min_rate),
+        neuron_embedding_scale=neuron_embedding_scale,
     )
 
     x_train = torch.as_tensor(train_x, dtype=torch.float32, device=device_obj)
@@ -206,12 +219,14 @@ def fit_predict_ndt_lite(
             xb = x_train.index_select(0, idx_tensor)
             target_hi = y_hi.index_select(0, idx_tensor)
             target_ho = y_ho.index_select(0, idx_tensor)
+            raw_input_hi = target_hi
             if train_mode and mask_prob > 0:
                 mask = torch.rand_like(xb) < float(mask_prob)
                 xb = xb.masked_fill(mask, 0.0)
+                raw_input_hi = target_hi.masked_fill(mask, 0.0)
             else:
                 mask = torch.ones_like(xb, dtype=torch.bool)
-            pred_hi, pred_ho = model(xb)
+            pred_hi, pred_ho = model(xb, raw_input_hi)
             loss = _poisson_loss(functional, pred_ho, target_ho)
             if heldin_loss_weight > 0:
                 if bool(mask.any()):
@@ -265,21 +280,23 @@ def fit_predict_ndt_lite(
 
         model.load_state_dict({name: tensor.to(device_obj) for name, tensor in best_state.items()})
 
-        def predict_rates(x_np: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        def predict_rates(x_np: np.ndarray, raw_np: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
             x_tensor = torch.as_tensor(x_np, dtype=torch.float32, device=device_obj)
+            raw_tensor = torch.as_tensor(raw_np, dtype=torch.float32, device=device_obj)
             heldin_batches: list[np.ndarray] = []
             heldout_batches: list[np.ndarray] = []
             model.eval()
             with torch.no_grad():
                 for start in range(0, x_tensor.shape[0], batch_size):
                     xb = x_tensor[start : start + batch_size]
-                    pred_hi, pred_ho = model(xb)
+                    raw_b = raw_tensor[start : start + batch_size]
+                    pred_hi, pred_ho = model(xb, raw_b)
                     heldin_batches.append(pred_hi.detach().cpu().numpy().astype(np.float32))
                     heldout_batches.append(pred_ho.detach().cpu().numpy().astype(np.float32))
             return np.concatenate(heldin_batches, axis=0), np.concatenate(heldout_batches, axis=0)
 
-        train_rates_heldin, train_rates_heldout = predict_rates(train_x)
-        eval_rates_heldin, eval_rates_heldout = predict_rates(eval_x)
+        train_rates_heldin, train_rates_heldout = predict_rates(train_x, train_hi)
+        eval_rates_heldin, eval_rates_heldout = predict_rates(eval_x, eval_hi)
         return {
             "train_rates_heldin": train_rates_heldin,
             "train_rates_heldout": train_rates_heldout,

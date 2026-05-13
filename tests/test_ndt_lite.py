@@ -100,6 +100,7 @@ def test_ndt_lite_poisson_loss_is_finite_on_synthetic_batch() -> None:
         n_heads=2,
         dropout=0.0,
         min_rate=1e-6,
+        neuron_embedding_scale=0.0,
     )
     model = model_cls()
     x = torch.randn(3, 6, 4)
@@ -177,6 +178,66 @@ def test_ndt_lite_invalid_lr_schedule_raises() -> None:
             lr_schedule="not_a_schedule",
             device="cpu",
         )
+
+
+def test_ndt_lite_invalid_neuron_embedding_scale_raises() -> None:
+    rng = np.random.default_rng(97)
+    train_hi = rng.poisson(0.5, (3, 6, 4)).astype(np.float32)
+    train_ho = rng.poisson(0.4, (3, 6, 2)).astype(np.float32)
+    eval_hi = rng.poisson(0.5, (1, 6, 4)).astype(np.float32)
+
+    with pytest.raises(ValueError, match="neuron_embedding_scale"):
+        fit_predict_ndt_lite(
+            train_hi,
+            train_ho,
+            eval_hi,
+            d_model=8,
+            n_layers=1,
+            n_heads=2,
+            dropout=0.0,
+            learning_rate=0.003,
+            weight_decay=0.0,
+            batch_size=2,
+            max_epochs=1,
+            patience=1,
+            mask_prob=0.0,
+            heldin_loss_weight=0.0,
+            validation_fraction=0.0,
+            input_transform="sqrt_zscore",
+            seed=0,
+            neuron_embedding_scale=-0.1,
+            device="cpu",
+        )
+
+
+def test_neuron_event_embeddings_change_transformer_output() -> None:
+    torch, nn, functional = _require_torch()
+    torch.manual_seed(98)
+    model_cls = _temporal_transformer_cls(
+        nn,
+        functional,
+        torch,
+        n_heldin=4,
+        n_heldout=2,
+        d_model=8,
+        max_t_len=6,
+        n_layers=1,
+        n_heads=2,
+        dropout=0.0,
+        min_rate=1e-6,
+        neuron_embedding_scale=0.5,
+    )
+    model = model_cls()
+    model.eval()
+    x = torch.randn(2, 6, 4)
+    raw_counts = torch.zeros(2, 6, 4)
+    raw_counts[:, :, 0] = 1.0
+
+    with torch.no_grad():
+        _heldin_a, heldout_a = model(x, raw_counts)
+        _heldin_b, heldout_b = model(x, torch.zeros_like(raw_counts))
+
+    assert not torch.allclose(heldout_a, heldout_b)
 
 
 def test_ndt_lite_ensemble_matches_mean_of_single_seed_runs() -> None:

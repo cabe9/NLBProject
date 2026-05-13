@@ -197,6 +197,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             ("input_transform", str),
             ("seed", int),
             ("lr_schedule", str),
+            ("neuron_embedding_scale", float),
             ("ensemble_size", int),
             ("device", str),
         ),
@@ -207,6 +208,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             SweepAxis("learning_rate_grid", "learning_rate", float),
             SweepAxis("mask_prob_grid", "mask_prob", float),
             SweepAxis("lr_schedule_grid", "lr_schedule", str),
+            SweepAxis("neuron_embedding_scale_grid", "neuron_embedding_scale", float),
         ),
         improvement_overrides=(
             ("n_heads", int),

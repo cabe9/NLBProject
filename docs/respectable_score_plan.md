@@ -52,13 +52,16 @@ The repo now includes a small Neural Data Transformer-style model:
   final train/val result: the selected no-dropout model scored `0.2320 co-bps`
   versus the `0.2481` width reference, so it should not be promoted to
   public-test scoring.
+- A first neuron-event embedding sweep also did **not** improve validation:
+  positive scales `[0.1, 0.25, 0.5]` all trailed the `0.0` scale anchor, so the
+  simple event-embedding path should remain off for the current headline.
 
 The next practical target is `>0.32 co-bps`, roughly old NDT-class performance,
 without tuning directly on the public test result. Likely useful changes are
-seed-ensemble sizing, better validation stability, and then neuron-aware spatial
-modeling. Do not spend more public-test runs on the first depth/dropout/cosine
-schedule sweep unless a later train/val run beats the `0.2481` single-model
-width reference.
+seed-ensemble sizing, better validation stability, and then a real factorized
+time-by-neuron attention block. Do not spend more public-test runs on the first
+depth/dropout/cosine schedule sweep or the simple event-embedding sweep unless a
+later train/val run beats the `0.2481` single-model width reference.
 
 Run the initial NDT-lite config with:
 
@@ -81,6 +84,9 @@ nlb-evaluate-public-test \
 
 nlb-run-experiment \
   --config configs/benchmarks/mc_maze_ndt_lite_tuning_sweep.yaml
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_ndt_lite_neuron_sweep.yaml
 ```
 
 ### Bounded experiment brief (tooling / lighter models)

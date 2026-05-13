@@ -11,7 +11,7 @@ All models share the same data path (NWB → tensors). Most families use the sha
 | `lagged_pca_latent_regression` | `models/lagged_pca_latent_regression.py` | Lag the held-in counts, compress with PCA on the lagged feature matrix, then ridge-regress. Strongest validated model in this repo. |
 | `lagged_reduced_rank_regression` | `models/lagged_reduced_rank_regression.py` | Supervised low-rank analogue of lagged PCA — ridge regression with a rank constraint on the coefficient matrix. Control for "is the PCA bottleneck doing real work?". |
 | `lds_pca_latent_regression` | `models/lds_pca_latent_regression.py` | PCA latent fit jointly with a linear dynamical system (Kalman + RTS smoother) over time, then ridge to held-out neurons. Exploratory; compares against the non-dynamical lagged baseline. |
-| `ndt_lite` | `models/ndt_lite.py` | Small PyTorch temporal transformer over held-in spike counts with random held-in masking, Poisson rate losses, optional cosine learning-rate scheduling, and optional seed ensembling (members use seeds `seed`, `seed+1`, …; rates are averaged). First neural-sequence baseline toward NDT/STNDT-class methods. |
+| `ndt_lite` | `models/ndt_lite.py` | Small PyTorch temporal transformer over held-in spike counts with random held-in masking, Poisson rate losses, optional neuron event embeddings, optional cosine learning-rate scheduling, and optional seed ensembling (members use seeds `seed`, `seed+1`, …; rates are averaged). First neural-sequence baseline toward NDT/STNDT-class methods. |
 
 ## Design principles
 
