@@ -57,6 +57,50 @@ def _poisson_loss(functional: Any, pred: Any, target: Any) -> Any:
     return functional.poisson_nll_loss(pred, target, log_input=False, full=False)
 
 
+def _temporal_transformer_cls(
+    nn: Any,
+    functional: Any,
+    torch: Any,
+    *,
+    n_heldin: int,
+    n_heldout: int,
+    d_model: int,
+    max_t_len: int,
+    n_layers: int,
+    n_heads: int,
+    dropout: float,
+    min_rate: float,
+) -> type:
+    """Return ``nn.Module`` subclass; defined after Torch import so it stays optional."""
+
+    class TemporalTransformer(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.input_proj = nn.Linear(n_heldin, d_model)
+            self.pos_embed = nn.Parameter(torch.zeros(1, max_t_len, d_model))
+            layer = nn.TransformerEncoderLayer(
+                d_model=d_model,
+                nhead=n_heads,
+                dim_feedforward=4 * d_model,
+                dropout=float(dropout),
+                activation="gelu",
+                batch_first=True,
+                norm_first=True,
+            )
+            self.encoder = nn.TransformerEncoder(layer, num_layers=n_layers)
+            self.heldin_head = nn.Linear(d_model, n_heldin)
+            self.heldout_head = nn.Linear(d_model, n_heldout)
+
+        def forward(self, x):
+            h = self.input_proj(x) + self.pos_embed[:, : x.shape[1], :]
+            h = self.encoder(h)
+            heldin = functional.softplus(self.heldin_head(h)) + float(min_rate)
+            heldout = functional.softplus(self.heldout_head(h)) + float(min_rate)
+            return heldin, heldout
+
+    return TemporalTransformer
+
+
 def fit_predict_ndt_lite(
     train_spikes_heldin: np.ndarray,
     train_spikes_heldout: np.ndarray,
@@ -105,30 +149,19 @@ def fit_predict_ndt_lite(
     batch_size = max(1, int(batch_size))
     device_obj = _resolve_device(torch, device)
 
-    class TemporalTransformer(nn.Module):  # type: ignore[name-defined]
-        def __init__(self) -> None:
-            super().__init__()
-            self.input_proj = nn.Linear(n_heldin, d_model)
-            self.pos_embed = nn.Parameter(torch.zeros(1, max_t_len, d_model))
-            layer = nn.TransformerEncoderLayer(
-                d_model=d_model,
-                nhead=n_heads,
-                dim_feedforward=4 * d_model,
-                dropout=float(dropout),
-                activation="gelu",
-                batch_first=True,
-                norm_first=True,
-            )
-            self.encoder = nn.TransformerEncoder(layer, num_layers=n_layers)
-            self.heldin_head = nn.Linear(d_model, n_heldin)
-            self.heldout_head = nn.Linear(d_model, n_heldout)
-
-        def forward(self, x):
-            h = self.input_proj(x) + self.pos_embed[:, : x.shape[1], :]
-            h = self.encoder(h)
-            heldin = functional.softplus(self.heldin_head(h)) + float(min_rate)
-            heldout = functional.softplus(self.heldout_head(h)) + float(min_rate)
-            return heldin, heldout
+    TemporalTransformer = _temporal_transformer_cls(
+        nn,
+        functional,
+        torch,
+        n_heldin=n_heldin,
+        n_heldout=n_heldout,
+        d_model=d_model,
+        max_t_len=max_t_len,
+        n_layers=n_layers,
+        n_heads=n_heads,
+        dropout=float(dropout),
+        min_rate=float(min_rate),
+    )
 
     x_train = torch.as_tensor(train_x, dtype=torch.float32, device=device_obj)
     y_hi = torch.as_tensor(train_hi, dtype=torch.float32, device=device_obj)

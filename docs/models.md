@@ -1,6 +1,6 @@
 # Model families
 
-All models share the same data path (NWB → tensors) and the same rate readout (`output_head`, default `log_link`). They differ only in how they map held-in spike counts to held-out neuron rates.
+All models share the same data path (NWB → tensors). Most families use the shared `output_head` readout (default `log_link`); `ndt_lite` emits rates directly. They differ in how they map held-in spike counts to held-in and held-out neuron rates.
 
 | Family | File | Key idea |
 |---|---|---|
@@ -11,12 +11,12 @@ All models share the same data path (NWB → tensors) and the same rate readout 
 | `lagged_pca_latent_regression` | `models/lagged_pca_latent_regression.py` | Lag the held-in counts, compress with PCA on the lagged feature matrix, then ridge-regress. Strongest validated model in this repo. |
 | `lagged_reduced_rank_regression` | `models/lagged_reduced_rank_regression.py` | Supervised low-rank analogue of lagged PCA — ridge regression with a rank constraint on the coefficient matrix. Control for "is the PCA bottleneck doing real work?". |
 | `lds_pca_latent_regression` | `models/lds_pca_latent_regression.py` | PCA latent fit jointly with a linear dynamical system (Kalman + RTS smoother) over time, then ridge to held-out neurons. Exploratory; compares against the non-dynamical lagged baseline. |
-| `ndt_lite` | `models/ndt_lite.py` | Small PyTorch temporal transformer over held-in spike counts with random held-in masking, Poisson rate losses, and optional seed ensembling. First neural-sequence baseline toward NDT/STNDT-class methods. |
+| `ndt_lite` | `models/ndt_lite.py` | Small PyTorch temporal transformer over held-in spike counts with random held-in masking, Poisson rate losses, and optional seed ensembling (members use seeds `seed`, `seed+1`, …; rates are averaged). First neural-sequence baseline toward NDT/STNDT-class methods. |
 
 ## Design principles
 
 - **One `fit_predict_*` per family.** Every model exposes a single callable that takes the built tensors and returns held-in + held-out rate predictions. No hidden state across calls.
 - **Train-only preprocessing.** Any scaling / PCA basis / lag-buffer initial values are fit on train data only, then applied frozen to eval tensors. This is enforced in `models/temporal_features.py`.
-- **Shared rate readout.** None of the models implement their own rate conversion; they all route predictions through `models/output_head.py`. This is what makes the cross-model comparison fair (see `docs/output_head_postmortem.md` for why this matters).
+- **Shared rate readout for linear baselines.** Families registered with `uses_rate_head=True` route predictions through `models/output_head.py` so cross-model comparisons stay apples-to-apples (see `docs/output_head_postmortem.md`). The `ndt_lite` family sets `uses_rate_head=False` and emits positive Poisson rates directly from the network.
 - **Neural baselines stay optional.** `ndt_lite` requires PyTorch and is installed with `pip install -e .[neural]`; the default linear/reproducibility path remains lightweight.
 - **Declarative registration.** Each family is registered in `src/nlb_project/model_registry.py` with its parameter names, sweep axes, and CV defaults. Adding a new family means writing the model file and appending one `ModelSpec` entry.

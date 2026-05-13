@@ -9,11 +9,11 @@ make public-test
 
 The current reproducible public-test scores:
 
-| dataset split | model | co-bps | vel R2 |
-|---|---|---:|---:|
-| `MC_Maze 5 ms` public test | lagged PCA latent regression, selected history | 0.0268 | 0.3678 |
-| `MC_Maze 5 ms` public test | NDT-lite temporal transformer | 0.2338 | 0.6412 |
-| `MC_Maze 5 ms` public test | NDT-lite, 3-seed ensemble | 0.2481 | 0.6589 |
+| dataset split | model | co-bps | vel R² | psth R² |
+|---|---|---:|---:|---:|
+| `MC_Maze 5 ms` public test | lagged PCA latent regression, selected history | 0.0268 | 0.3678 | −26.4081 |
+| `MC_Maze 5 ms` public test | NDT-lite temporal transformer | 0.2338 | 0.6412 | 0.3397 |
+| `MC_Maze 5 ms` public test | NDT-lite, 3-seed ensemble | 0.2481 | 0.6589 | 0.4086 |
 
 The lagged-PCA score is useful as a reproducible floor, not as a competitive
 endpoint. The NDT-lite ensemble result is the first measurable neural-sequence
@@ -63,6 +63,17 @@ nlb-evaluate-public-test \
   --config configs/benchmarks/mc_maze_ndt_lite_ensemble.yaml \
   --output-dir results/public_test/mc_maze_ndt_lite_ensemble
 ```
+
+### Bounded experiment brief (tooling / lighter models)
+
+Use this shape when delegating **config-only** or **small scripted** changes so scope stays reviewable:
+
+1. **Hypothesis** — One sentence (e.g. “larger `d_model` improves co-bps before ensemble”).
+2. **Allowed edits** — List paths (e.g. `configs/benchmarks/mc_maze_ndt_lite.yaml` only, or `improvement` section only).
+3. **Caps** — Explicit bounds (e.g. `max_epochs ≤ 80`, `d_model_grid ⊆ {64, 128}`, do not change `baseline` defaults).
+4. **Verification** — `ruff check .`, `ruff format --check .`, `mypy src scripts tests`, `pytest -q`; treat **co-bps / R² numbers in docs** as authoritative only after you rerun `nlb-evaluate-public-test` locally.
+
+Reserve architecture choices (causal attention, schedules, new objectives) and multi-axis science sweeps for human judgment or a stronger model pass.
 
 ## Why not keep tuning the current model?
 

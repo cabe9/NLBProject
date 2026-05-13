@@ -49,10 +49,13 @@ The target HDF5 is downloaded from the official `neurallatents/nlb_tools`
 repo and verified by SHA-256; it is ignored by git.
 
 For the neural public-test baseline, install the optional PyTorch dependency
-and run:
+and run either the single-member config or the 3-seed ensemble (headline score):
 
 ```bash
 python -m pip install -e '.[dev,neural]'
+nlb-evaluate-public-test \
+  --config configs/benchmarks/mc_maze_ndt_lite.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite
 nlb-evaluate-public-test \
   --config configs/benchmarks/mc_maze_ndt_lite_ensemble.yaml \
   --output-dir results/public_test/mc_maze_ndt_lite_ensemble
