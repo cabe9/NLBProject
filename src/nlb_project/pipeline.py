@@ -124,12 +124,19 @@ def iter_cv_candidates(
     spec: ModelSpec, cfg: ExperimentConfig
 ) -> Iterator[tuple[dict[str, Any], str]]:
     """Yield ``(params_dict, label)`` pairs for every CV candidate."""
+    axes: list[Any] = []
     grids: list[list[Any]] = []
     for axis in spec.sweep_axes:
         if axis.grid_key not in cfg.improvement:
             raise KeyError(
                 f"Missing required improvement key `{axis.grid_key}` for model `{spec.name}`"
             )
+        axes.append(axis)
+        grids.append([axis.caster(v) for v in cfg.improvement[axis.grid_key]])
+    for axis in spec.optional_sweep_axes:
+        if axis.grid_key not in cfg.improvement:
+            continue
+        axes.append(axis)
         grids.append([axis.caster(v) for v in cfg.improvement[axis.grid_key]])
 
     base = _apply_improvement_overrides(spec, cfg, _baseline_scalar_params(spec, cfg))
@@ -138,7 +145,7 @@ def iter_cv_candidates(
     for values in itertools.product(*grids):
         params = dict(base)
         label_parts: list[str] = []
-        for axis, v in zip(spec.sweep_axes, values, strict=True):
+        for axis, v in zip(axes, values, strict=True):
             params[axis.param_name] = v
             label_parts.append(f"{axis.param_name}={v}")
         params.update(head_extras)

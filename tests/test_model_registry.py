@@ -23,6 +23,10 @@ def _assert_registry_param_names_match_fit_predict_signature(model_type, predict
 
     for axis in spec.sweep_axes:
         assert axis.param_name in names, f"sweep axis `{axis.param_name}` missing from signature"
+    for axis in spec.optional_sweep_axes:
+        assert axis.param_name in names, (
+            f"optional sweep axis `{axis.param_name}` missing from signature"
+        )
 
 
 def test_ndt_lite_registry_param_names_match_fit_predict_signature() -> None:

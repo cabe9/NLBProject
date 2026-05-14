@@ -15,10 +15,11 @@ The current reproducible public-test scores:
 | `MC_Maze 5 ms` public test | NDT-lite temporal transformer | 0.2338 | 0.6412 | 0.3397 |
 | `MC_Maze 5 ms` public test | NDT-lite, 3-seed ensemble | 0.2481 | 0.6589 | 0.4086 |
 | `MC_Maze 5 ms` public test | NDT-lite, wider 3-seed ensemble | 0.2951 | 0.7096 | 0.5498 |
+| `MC_Maze 5 ms` public test | NDT-lite, wider 5-seed ensemble | 0.3004 | 0.7222 | 0.5601 |
 
 The lagged-PCA score is useful as a reproducible floor, not as a competitive
 endpoint. The wider NDT-lite ensemble result is the first clearly respectable
-neural-sequence baseline: about `+0.268 co-bps` absolute over the linear
+neural-sequence baseline: about `+0.274 co-bps` absolute over the linear
 baseline, while still leaving a clear gap to old public leaderboard methods.
 On the frozen EvalAI `MC_Maze 5 ms` leaderboard, representative co-bps levels are:
 
@@ -55,6 +56,9 @@ The repo now includes a small Neural Data Transformer-style model:
 - A first neuron-event embedding sweep also did **not** improve validation:
   positive scales `[0.1, 0.25, 0.5]` all trailed the `0.0` scale anchor, so the
   simple event-embedding path should remain off for the current headline.
+- A validation-led ensemble-size sweep selected `ensemble_size=5` over the
+  existing 3-seed width ensemble: train/val co-bps improved from `0.2674` to
+  `0.2713`, and the single public-test run improved from `0.2951` to `0.3004`.
 - A first factorized neuron/time transformer is implemented as
   `model_type: ndt_factorized`, but the bounded mc_maze train/val run did
   **not** justify promotion: CV mean was `0.0153 co-bps`, and the completed
@@ -64,11 +68,12 @@ The repo now includes a small Neural Data Transformer-style model:
 
 The next practical target is `>0.32 co-bps`, roughly old NDT-class performance,
 without tuning directly on the public test result. Likely useful changes are
-seed-ensemble sizing and better validation stability around the current
-NDT-lite model. Do not spend public-test runs on the first depth/dropout/cosine
-schedule sweep, the simple event-embedding sweep, or the first factorized
-architecture unless a later train/val run beats the `0.2481` single-model width
-reference.
+better validation stability around the current NDT-lite model, then a more
+faithful NDT/STNDT-style architecture if stability work plateaus. Do not spend
+more public-test runs on the first depth/dropout/cosine schedule sweep, the
+simple event-embedding sweep, the first factorized architecture, or larger
+ensembles unless a later train/val run beats the current `0.2713` 5-seed
+train/val result.
 
 Run the initial NDT-lite config with:
 
@@ -94,6 +99,13 @@ nlb-run-experiment \
 
 nlb-run-experiment \
   --config configs/benchmarks/mc_maze_ndt_lite_neuron_sweep.yaml
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_ndt_lite_ensemble_size_sweep.yaml
+
+nlb-evaluate-public-test \
+  --config configs/benchmarks/mc_maze_ndt_lite_ensemble_size_sweep.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite_5seed_ensemble
 
 nlb-run-experiment \
   --config configs/benchmarks/mc_maze_ndt_factorized_sweep.yaml

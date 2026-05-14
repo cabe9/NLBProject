@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml/badge.svg)](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml)
 
-This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The linear baseline shows why short neural history matters; the NDT-lite transformer path now reaches `0.2951 co-bps` on the local public-test target with a wider 3-seed ensemble, all scored through the official `nlb_tools` evaluation code.
+This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The linear baseline shows why short neural history matters; the NDT-lite transformer path now reaches `0.3004 co-bps` on the local public-test target with a wider 5-seed ensemble, all scored through the official `nlb_tools` evaluation code.
 
 ## Start here in 10 minutes
 
@@ -54,8 +54,8 @@ and run the current headline config:
 ```bash
 python -m pip install -e '.[dev,neural]'
 nlb-evaluate-public-test \
-  --config configs/benchmarks/mc_maze_ndt_lite_width_ensemble.yaml \
-  --output-dir results/public_test/mc_maze_ndt_lite_width_ensemble
+  --config configs/benchmarks/mc_maze_ndt_lite_ensemble_size_sweep.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite_5seed_ensemble
 ```
 
 Where outputs appear:
@@ -94,7 +94,8 @@ Local evaluation against the public NLB test target HDF5:
 | lagged PCA latent regression, selected history | 0.0268 | 0.3678 | -26.4081 |
 | NDT-lite temporal transformer | 0.2338 | 0.6412 | 0.3397 |
 | NDT-lite, 3-seed ensemble | 0.2481 | 0.6589 | 0.4086 |
-| **NDT-lite, wider 3-seed ensemble** | **0.2951** | **0.7096** | **0.5498** |
+| NDT-lite, wider 3-seed ensemble | 0.2951 | 0.7096 | 0.5498 |
+| **NDT-lite, wider 5-seed ensemble** | **0.3004** | **0.7222** | **0.5601** |
 
 **Takeaways**
 
@@ -165,7 +166,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full pipeline.
 - The neural path is still a compact NDT-style baseline, not a full reproduction of the strongest NLB leaderboard systems.
 - The public-test target is local and reproducible because EvalAI submissions are closed; it should be treated as a frozen benchmark artifact, not a live leaderboard submission.
 
-Most justified next step for a measurable achievement: push the NDT-lite path from `0.2951` toward old NDT-class `>0.32 co-bps` through validation-led tuning. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
+Most justified next step for a measurable achievement: push the NDT-lite path from `0.3004` toward old NDT-class `>0.32 co-bps` through validation-led tuning. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
 
 ## Citation
 

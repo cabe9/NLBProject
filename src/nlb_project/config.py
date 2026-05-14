@@ -152,13 +152,22 @@ def _validate_improvement(section: Any, spec: ModelSpec) -> dict[str, Any]:
         raise ValueError(f"`improvement` section for model `{spec.name}` must be a mapping")
 
     required_grids = {axis.grid_key for axis in spec.sweep_axes}
+    optional_grids = {axis.grid_key for axis in spec.optional_sweep_axes}
     override_keys = {name for name, _ in spec.improvement_overrides}
-    allowed = required_grids | override_keys | _OPTIONAL_IMPROVEMENT_KEYS
+    allowed = required_grids | optional_grids | override_keys | _OPTIONAL_IMPROVEMENT_KEYS
 
     _require_keys(section, required_grids, context=f"improvement[{spec.name}]")
     _reject_unknown_keys(section, allowed, context=f"improvement[{spec.name}]")
 
     for axis in spec.sweep_axes:
+        grid = section[axis.grid_key]
+        if not isinstance(grid, list) or len(grid) == 0:
+            raise ValueError(
+                f"improvement[{spec.name}].{axis.grid_key}: expected non-empty list, got {grid!r}"
+            )
+    for axis in spec.optional_sweep_axes:
+        if axis.grid_key not in section:
+            continue
         grid = section[axis.grid_key]
         if not isinstance(grid, list) or len(grid) == 0:
             raise ValueError(

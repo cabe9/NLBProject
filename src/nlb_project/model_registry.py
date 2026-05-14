@@ -59,6 +59,7 @@ class ModelSpec:
     predict: Callable[..., dict]
     baseline_params: tuple[tuple[str, Caster], ...]
     sweep_axes: tuple[SweepAxis, ...]
+    optional_sweep_axes: tuple[SweepAxis, ...] = ()
     improvement_overrides: tuple[tuple[str, Caster], ...] = ()
     uses_rate_head: bool = True
     passes_log_offset: bool = False
@@ -211,6 +212,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             SweepAxis("lr_schedule_grid", "lr_schedule", str),
             SweepAxis("neuron_embedding_scale_grid", "neuron_embedding_scale", float),
         ),
+        optional_sweep_axes=(SweepAxis("ensemble_size_grid", "ensemble_size", int),),
         improvement_overrides=(
             ("n_heads", int),
             ("weight_decay", float),
