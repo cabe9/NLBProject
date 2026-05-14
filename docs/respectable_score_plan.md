@@ -55,13 +55,20 @@ The repo now includes a small Neural Data Transformer-style model:
 - A first neuron-event embedding sweep also did **not** improve validation:
   positive scales `[0.1, 0.25, 0.5]` all trailed the `0.0` scale anchor, so the
   simple event-embedding path should remain off for the current headline.
+- A first factorized neuron/time transformer is implemented as
+  `model_type: ndt_factorized`, but the bounded mc_maze train/val run did
+  **not** justify promotion: CV mean was `0.0153 co-bps`, and the completed
+  train/val artifact in `results/benchmark_runs/ndt_factorized_sweep/metrics.csv`
+  scored below the current NDT-lite reference. Treat it as an architecture
+  foundation/guardrail, not a score-improvement path.
 
 The next practical target is `>0.32 co-bps`, roughly old NDT-class performance,
 without tuning directly on the public test result. Likely useful changes are
-seed-ensemble sizing, better validation stability, and then a real factorized
-time-by-neuron attention block. Do not spend more public-test runs on the first
-depth/dropout/cosine schedule sweep or the simple event-embedding sweep unless a
-later train/val run beats the `0.2481` single-model width reference.
+seed-ensemble sizing and better validation stability around the current
+NDT-lite model. Do not spend public-test runs on the first depth/dropout/cosine
+schedule sweep, the simple event-embedding sweep, or the first factorized
+architecture unless a later train/val run beats the `0.2481` single-model width
+reference.
 
 Run the initial NDT-lite config with:
 
@@ -87,6 +94,9 @@ nlb-run-experiment \
 
 nlb-run-experiment \
   --config configs/benchmarks/mc_maze_ndt_lite_neuron_sweep.yaml
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_ndt_factorized_sweep.yaml
 ```
 
 ### Bounded experiment brief (tooling / lighter models)

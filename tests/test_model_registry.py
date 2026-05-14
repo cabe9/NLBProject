@@ -3,13 +3,14 @@ from __future__ import annotations
 import inspect
 
 from nlb_project.model_registry import get_spec
+from nlb_project.models.ndt_factorized import fit_predict_ndt_factorized
 from nlb_project.models.ndt_lite import fit_predict_ndt_lite
 
 
-def test_ndt_lite_registry_param_names_match_fit_predict_signature() -> None:
-    """Guardrail: pipeline passes ``params`` as kwargs to ``fit_predict_ndt_lite``."""
-    spec = get_spec("ndt_lite")
-    sig = inspect.signature(fit_predict_ndt_lite)
+def _assert_registry_param_names_match_fit_predict_signature(model_type, predict) -> None:
+    """Guardrail: pipeline passes registry ``params`` as kwargs to fit functions."""
+    spec = get_spec(model_type)
+    sig = inspect.signature(predict)
     names = set(sig.parameters)
 
     for param_name, _caster in spec.baseline_params:
@@ -22,3 +23,13 @@ def test_ndt_lite_registry_param_names_match_fit_predict_signature() -> None:
 
     for axis in spec.sweep_axes:
         assert axis.param_name in names, f"sweep axis `{axis.param_name}` missing from signature"
+
+
+def test_ndt_lite_registry_param_names_match_fit_predict_signature() -> None:
+    _assert_registry_param_names_match_fit_predict_signature("ndt_lite", fit_predict_ndt_lite)
+
+
+def test_ndt_factorized_registry_param_names_match_fit_predict_signature() -> None:
+    _assert_registry_param_names_match_fit_predict_signature(
+        "ndt_factorized", fit_predict_ndt_factorized
+    )

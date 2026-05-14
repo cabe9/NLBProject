@@ -177,3 +177,16 @@ def test_ndt_lite_neuron_sweep_config_loads_without_torch() -> None:
     assert cfg.baseline["d_model"] == 128
     assert cfg.baseline["neuron_embedding_scale"] == 0.0
     assert cfg.improvement["neuron_embedding_scale_grid"] == [0.0, 0.1, 0.25, 0.5]
+
+
+def test_ndt_factorized_sweep_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_factorized_sweep.yaml")
+
+    assert cfg.model_type == "ndt_factorized"
+    assert cfg.baseline["d_model"] == 64
+    assert cfg.baseline["n_layers"] == 2
+    assert cfg.baseline["n_latents"] == 4
+    assert cfg.improvement["d_model_grid"] == [64]
+    assert cfg.improvement["n_layers_grid"] == [2]
+    assert cfg.improvement["n_latents_grid"] == [4]
+    assert cfg.improvement["ensemble_size"] == 1
