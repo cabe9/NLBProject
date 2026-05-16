@@ -46,7 +46,7 @@ _REQUIRED_TOP_LEVEL_KEYS = frozenset(
     }
 )
 _ALLOWED_TOP_LEVEL_KEYS = _REQUIRED_TOP_LEVEL_KEYS | {"model_type", "output_head"}
-_OPTIONAL_IMPROVEMENT_KEYS = frozenset({"cv_folds", "output_head", "log_offset"})
+_OPTIONAL_IMPROVEMENT_KEYS = frozenset({"cv_folds", "output_head", "log_offset", "candidates"})
 
 
 @dataclass
@@ -151,33 +151,87 @@ def _validate_improvement(section: Any, spec: ModelSpec) -> dict[str, Any]:
     if not isinstance(section, dict):
         raise ValueError(f"`improvement` section for model `{spec.name}` must be a mapping")
 
+    has_explicit_candidates = "candidates" in section
     required_grids = {axis.grid_key for axis in spec.sweep_axes}
     optional_grids = {axis.grid_key for axis in spec.optional_sweep_axes}
     override_keys = {name for name, _ in spec.improvement_overrides}
-    allowed = required_grids | optional_grids | override_keys | _OPTIONAL_IMPROVEMENT_KEYS
+    grid_keys = required_grids | optional_grids
+    allowed = (
+        override_keys | _OPTIONAL_IMPROVEMENT_KEYS
+        if has_explicit_candidates
+        else grid_keys | override_keys | _OPTIONAL_IMPROVEMENT_KEYS
+    )
 
-    _require_keys(section, required_grids, context=f"improvement[{spec.name}]")
+    if has_explicit_candidates:
+        present_grid_keys = sorted(grid_keys & set(section))
+        if present_grid_keys:
+            raise ValueError(
+                f"improvement[{spec.name}]: `candidates` cannot be mixed with grid keys "
+                f"{present_grid_keys}"
+            )
+    else:
+        _require_keys(section, required_grids, context=f"improvement[{spec.name}]")
     _reject_unknown_keys(section, allowed, context=f"improvement[{spec.name}]")
 
-    for axis in spec.sweep_axes:
-        grid = section[axis.grid_key]
-        if not isinstance(grid, list) or len(grid) == 0:
-            raise ValueError(
-                f"improvement[{spec.name}].{axis.grid_key}: expected non-empty list, got {grid!r}"
-            )
-    for axis in spec.optional_sweep_axes:
-        if axis.grid_key not in section:
-            continue
-        grid = section[axis.grid_key]
-        if not isinstance(grid, list) or len(grid) == 0:
-            raise ValueError(
-                f"improvement[{spec.name}].{axis.grid_key}: expected non-empty list, got {grid!r}"
-            )
+    if has_explicit_candidates:
+        _validate_candidate_list(section["candidates"], spec)
+    else:
+        for axis in spec.sweep_axes:
+            grid = section[axis.grid_key]
+            if not isinstance(grid, list) or len(grid) == 0:
+                raise ValueError(
+                    f"improvement[{spec.name}].{axis.grid_key}: expected non-empty list, got {grid!r}"
+                )
+        for axis in spec.optional_sweep_axes:
+            if axis.grid_key not in section:
+                continue
+            grid = section[axis.grid_key]
+            if not isinstance(grid, list) or len(grid) == 0:
+                raise ValueError(
+                    f"improvement[{spec.name}].{axis.grid_key}: expected non-empty list, got {grid!r}"
+                )
 
     if "output_head" in section:
         _validate_output_head(section["output_head"], context=f"improvement[{spec.name}]")
 
     return dict(section)
+
+
+def _candidate_param_casters(spec: ModelSpec) -> dict[str, Any]:
+    casters = dict(spec.baseline_params)
+    casters.update(spec.improvement_overrides)
+    for axis in (*spec.sweep_axes, *spec.optional_sweep_axes):
+        casters[axis.param_name] = axis.caster
+    return casters
+
+
+def _validate_candidate_list(candidates: Any, spec: ModelSpec) -> None:
+    if not isinstance(candidates, list) or len(candidates) == 0:
+        raise ValueError(
+            f"improvement[{spec.name}].candidates: expected non-empty list, got {candidates!r}"
+        )
+    casters = _candidate_param_casters(spec)
+    for idx, candidate in enumerate(candidates, start=1):
+        if not isinstance(candidate, dict):
+            raise ValueError(
+                f"improvement[{spec.name}].candidates[{idx}]: expected mapping, got {candidate!r}"
+            )
+        if not candidate:
+            raise ValueError(
+                f"improvement[{spec.name}].candidates[{idx}]: expected at least one param"
+            )
+        _reject_unknown_keys(
+            candidate,
+            casters,
+            context=f"improvement[{spec.name}].candidates[{idx}]",
+        )
+        for name, value in candidate.items():
+            try:
+                casters[name](value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"improvement[{spec.name}].candidates[{idx}].{name}: could not cast {value!r}"
+                ) from exc
 
 
 def load_config(path: str | Path) -> ExperimentConfig:

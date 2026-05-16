@@ -15,6 +15,8 @@ import pytest
 import yaml
 
 from nlb_project.config import DEFAULT_OUTPUT_HEAD, ExperimentConfig, load_config
+from nlb_project.model_registry import get_spec
+from nlb_project.pipeline import iter_cv_candidates
 
 
 def _valid_static_pca() -> dict:
@@ -94,6 +96,46 @@ def test_empty_sweep_grid_rejected(tmp_path: Path) -> None:
         load_config(path)
 
 
+def test_explicit_candidates_load_and_replace_grid_axes(tmp_path: Path) -> None:
+    raw = _valid_static_pca()
+    raw["improvement"] = {
+        "cv_folds": 2,
+        "candidates": [{"n_components": 8}, {"n_components": 12, "ridge_alpha": 1.0}],
+    }
+    path = tmp_path / "cfg.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    cfg = load_config(path)
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert [params["n_components"] for params, _label in candidates] == [8, 12]
+    assert [params["ridge_alpha"] for params, _label in candidates] == [0.1, 1.0]
+
+
+def test_explicit_candidates_reject_unknown_param(tmp_path: Path) -> None:
+    raw = _valid_static_pca()
+    raw["improvement"] = {"candidates": [{"not_a_param": 1}]}
+    path = tmp_path / "cfg.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unknown keys"):
+        load_config(path)
+
+
+def test_explicit_candidates_reject_mixed_grid_keys(tmp_path: Path) -> None:
+    raw = _valid_static_pca()
+    raw["improvement"] = {
+        "n_components_grid": [10],
+        "ridge_alpha_grid": [0.1],
+        "candidates": [{"n_components": 8}],
+    }
+    path = tmp_path / "cfg.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cannot be mixed"):
+        load_config(path)
+
+
 def test_bad_output_head_rejected(tmp_path: Path) -> None:
     raw = _valid_static_pca()
     raw["output_head"] = "not_a_real_head"
@@ -167,6 +209,42 @@ def test_ndt_lite_ensemble_size_sweep_config_loads_without_torch() -> None:
     assert cfg.improvement["d_model_grid"] == [128]
     assert cfg.improvement["neuron_embedding_scale_grid"] == [0.0]
     assert cfg.improvement["ensemble_size_grid"] == [3, 5]
+
+
+def test_ndt_lite_arch_screen_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_arch_screen.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["d_model"] == 128
+    assert cfg.improvement["ensemble_size"] == 1
+    assert len(candidates) == 11
+    assert candidates[0][0]["d_model"] == 128
+    assert candidates[-1][0]["d_model"] == 256
+    assert all(params["ensemble_size"] == 1 for params, _label in candidates)
+
+
+def test_ndt_lite_arch_5seed_sweep_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_arch_5seed_sweep.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["ensemble_size"] == 5
+    assert len(candidates) == 2
+    assert candidates[0][0]["d_model"] == 128
+    assert candidates[1][0]["d_model"] == 192
+    assert all(params["ensemble_size"] == 5 for params, _label in candidates)
+
+
+def test_ndt_lite_192_ensemble_sweep_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_192_ensemble_sweep.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["d_model"] == 192
+    assert cfg.improvement["ensemble_size_grid"] == [5, 7]
+    assert [params["ensemble_size"] for params, _label in candidates] == [5, 7]
+    assert all(params["d_model"] == 192 for params, _label in candidates)
 
 
 def test_ndt_lite_tuning_sweep_config_loads_without_torch() -> None:

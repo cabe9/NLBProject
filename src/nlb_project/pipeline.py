@@ -124,6 +124,25 @@ def iter_cv_candidates(
     spec: ModelSpec, cfg: ExperimentConfig
 ) -> Iterator[tuple[dict[str, Any], str]]:
     """Yield ``(params_dict, label)`` pairs for every CV candidate."""
+    base = _apply_improvement_overrides(spec, cfg, _baseline_scalar_params(spec, cfg))
+    head_extras = _rate_head_or_log_offset(spec, cfg, cfg.improvement)
+
+    if "candidates" in cfg.improvement:
+        casters = dict(spec.baseline_params)
+        casters.update(spec.improvement_overrides)
+        for axis in (*spec.sweep_axes, *spec.optional_sweep_axes):
+            casters[axis.param_name] = axis.caster
+        for idx, candidate in enumerate(cfg.improvement["candidates"], start=1):
+            params = dict(base)
+            candidate_label_parts: list[str] = [f"candidate={idx}"]
+            for name, raw_value in candidate.items():
+                value = casters[name](raw_value)
+                params[name] = value
+                candidate_label_parts.append(f"{name}={value}")
+            params.update(head_extras)
+            yield params, f"cv({','.join(candidate_label_parts)})"
+        return
+
     axes: list[Any] = []
     grids: list[list[Any]] = []
     for axis in spec.sweep_axes:
@@ -139,17 +158,14 @@ def iter_cv_candidates(
         axes.append(axis)
         grids.append([axis.caster(v) for v in cfg.improvement[axis.grid_key]])
 
-    base = _apply_improvement_overrides(spec, cfg, _baseline_scalar_params(spec, cfg))
-    head_extras = _rate_head_or_log_offset(spec, cfg, cfg.improvement)
-
     for values in itertools.product(*grids):
         params = dict(base)
-        label_parts: list[str] = []
+        grid_label_parts: list[str] = []
         for axis, v in zip(axes, values, strict=True):
             params[axis.param_name] = v
-            label_parts.append(f"{axis.param_name}={v}")
+            grid_label_parts.append(f"{axis.param_name}={v}")
         params.update(head_extras)
-        yield params, f"cv({','.join(label_parts)})"
+        yield params, f"cv({','.join(grid_label_parts)})"
 
 
 # -------- CV bookkeeping ---------------------------------------------------

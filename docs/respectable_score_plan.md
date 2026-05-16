@@ -16,10 +16,11 @@ The current reproducible public-test scores:
 | `MC_Maze 5 ms` public test | NDT-lite, 3-seed ensemble | 0.2481 | 0.6589 | 0.4086 |
 | `MC_Maze 5 ms` public test | NDT-lite, wider 3-seed ensemble | 0.2951 | 0.7096 | 0.5498 |
 | `MC_Maze 5 ms` public test | NDT-lite, wider 5-seed ensemble | 0.3004 | 0.7222 | 0.5601 |
+| `MC_Maze 5 ms` public test | NDT-lite, tuned 192-wide 5-seed ensemble | 0.3121 | 0.7343 | 0.6116 |
 
 The lagged-PCA score is useful as a reproducible floor, not as a competitive
 endpoint. The wider NDT-lite ensemble result is the first clearly respectable
-neural-sequence baseline: about `+0.274 co-bps` absolute over the linear
+neural-sequence baseline: about `+0.285 co-bps` absolute over the linear
 baseline, while still leaving a clear gap to old public leaderboard methods.
 On the frozen EvalAI `MC_Maze 5 ms` leaderboard, representative co-bps levels are:
 
@@ -59,6 +60,13 @@ The repo now includes a small Neural Data Transformer-style model:
 - A validation-led ensemble-size sweep selected `ensemble_size=5` over the
   existing 3-seed width ensemble: train/val co-bps improved from `0.2674` to
   `0.2713`, and the single public-test run improved from `0.2951` to `0.3004`.
+- A curated NDT-lite architecture screen selected `d_model=192`, `dropout=0.05`,
+  and `mask_prob=0.3`: single-seed train/val improved from `0.2481` to `0.2523`.
+  Promoting that config to 5 seeds improved train/val from `0.2713` to `0.2891`,
+  and the single public-test run improved from `0.3004` to `0.3121`.
+- A 7-seed follow-up for the tuned 192-wide model improved train/val only to
+  `0.2915`, below the stricter public-test gate, so it was not scored on public
+  test.
 - A first factorized neuron/time transformer is implemented as
   `model_type: ndt_factorized`, but the bounded mc_maze train/val run did
   **not** justify promotion: CV mean was `0.0153 co-bps`, and the completed
@@ -72,8 +80,8 @@ better validation stability around the current NDT-lite model, then a more
 faithful NDT/STNDT-style architecture if stability work plateaus. Do not spend
 more public-test runs on the first depth/dropout/cosine schedule sweep, the
 simple event-embedding sweep, the first factorized architecture, or larger
-ensembles unless a later train/val run beats the current `0.2713` 5-seed
-train/val result.
+ensembles unless a later train/val run beats the current `0.2915` 7-seed
+train/val result and clears a stricter public-test gate around `0.297`.
 
 Run the initial NDT-lite config with:
 
@@ -108,6 +116,19 @@ nlb-evaluate-public-test \
   --output-dir results/public_test/mc_maze_ndt_lite_5seed_ensemble
 
 nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_ndt_lite_arch_screen.yaml
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_ndt_lite_arch_5seed_sweep.yaml
+
+nlb-evaluate-public-test \
+  --config configs/benchmarks/mc_maze_ndt_lite_arch_5seed_sweep.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite_192_5seed
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_ndt_lite_192_ensemble_sweep.yaml
+
+nlb-run-experiment \
   --config configs/benchmarks/mc_maze_ndt_factorized_sweep.yaml
 ```
 
@@ -122,13 +143,17 @@ Use this shape when delegating **config-only** or **small scripted** changes so 
 
 Reserve architecture choices (causal attention, schedules, new objectives) and multi-axis science sweeps for human judgment or a stronger model pass.
 
-## Why not keep tuning the current model?
+## Why not only scale ensembles?
 
-The current best model is linear after lagged PCA features. It is valuable as
-a transparent baseline, but the leaderboard methods that score well are
-sequence models: NDT/STNDT-style transformers, LFADS-style recurrent latent
-models, S5/state-space models, and ensembles. Hyperparameter tuning the
-linear path is unlikely to close a `~0.30 co-bps` gap.
+The current best model is now a compact NDT-style transformer, not the older
+lagged-PCA baseline. It is close to old NDT-class public performance, but pure
+ensemble scaling is showing diminishing returns: a 7-seed follow-up improved
+train/val only modestly and did not clear the public-test gate. The most useful
+next work is either a tightly bounded stability pass around the selected
+NDT-lite config or a more faithful NDT/STNDT-style architecture. SSM/Mamba-style
+temporal mixers are worth considering later, but the `mc_maze` sequences are
+short enough that the current gap is unlikely to be mostly a long-context
+efficiency problem.
 
 ## References
 
