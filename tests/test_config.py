@@ -247,6 +247,44 @@ def test_ndt_lite_192_ensemble_sweep_config_loads_without_torch() -> None:
     assert all(params["d_model"] == 192 for params, _label in candidates)
 
 
+def test_ndt_lite_192_stability_screen_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_192_stability_screen.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["d_model"] == 192
+    assert cfg.improvement["ensemble_size"] == 1
+    assert len(candidates) == 15
+    assert candidates[0][0]["batch_size"] == 64
+    assert candidates[10][0]["batch_size"] == 32
+    assert all(params["ensemble_size"] == 1 for params, _label in candidates)
+
+
+def test_ndt_lite_192_stability_5seed_sweep_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_192_stability_5seed_sweep.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["ensemble_size"] == 5
+    assert len(candidates) == 2
+    assert candidates[0][0]["heldin_loss_weight"] == 0.2
+    assert candidates[1][0]["heldin_loss_weight"] == 0.3
+    assert candidates[1][0]["validation_fraction"] == 0.05
+    assert candidates[1][0]["max_epochs"] == 60
+    assert all(params["ensemble_size"] == 5 for params, _label in candidates)
+
+
+def test_ndt_lite_192_stability_ensemble_sweep_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_192_stability_ensemble_sweep.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "ndt_lite"
+    assert cfg.baseline["heldin_loss_weight"] == 0.3
+    assert cfg.improvement["ensemble_size_grid"] == [5, 7]
+    assert [params["ensemble_size"] for params, _label in candidates] == [5, 7]
+    assert all(params["validation_fraction"] == 0.05 for params, _label in candidates)
+
+
 def test_ndt_lite_tuning_sweep_config_loads_without_torch() -> None:
     cfg = load_config("configs/benchmarks/mc_maze_ndt_lite_tuning_sweep.yaml")
 

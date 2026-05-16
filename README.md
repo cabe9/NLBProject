@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml/badge.svg)](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml)
 
-This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The linear baseline shows why short neural history matters; the NDT-lite transformer path now reaches `0.3121 co-bps` on the local public-test target with a tuned 5-seed ensemble, all scored through the official `nlb_tools` evaluation code.
+This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The linear baseline shows why short neural history matters; the NDT-lite transformer path now reaches `0.3229 co-bps` on the local public-test target with a stability-tuned 7-seed ensemble, all scored through the official `nlb_tools` evaluation code.
 
 ## Start here in 10 minutes
 
@@ -54,8 +54,8 @@ and run the current headline config:
 ```bash
 python -m pip install -e '.[dev,neural]'
 nlb-evaluate-public-test \
-  --config configs/benchmarks/mc_maze_ndt_lite_arch_5seed_sweep.yaml \
-  --output-dir results/public_test/mc_maze_ndt_lite_192_5seed
+  --config configs/benchmarks/mc_maze_ndt_lite_192_stability_ensemble_sweep.yaml \
+  --output-dir results/public_test/mc_maze_ndt_lite_192_stability_7seed
 ```
 
 Where outputs appear:
@@ -96,7 +96,9 @@ Local evaluation against the public NLB test target HDF5:
 | NDT-lite, 3-seed ensemble | 0.2481 | 0.6589 | 0.4086 |
 | NDT-lite, wider 3-seed ensemble | 0.2951 | 0.7096 | 0.5498 |
 | NDT-lite, wider 5-seed ensemble | 0.3004 | 0.7222 | 0.5601 |
-| **NDT-lite, tuned 192-wide 5-seed ensemble** | **0.3121** | **0.7343** | **0.6116** |
+| NDT-lite, tuned 192-wide 5-seed ensemble | 0.3121 | 0.7343 | 0.6116 |
+| NDT-lite, stability-tuned 192-wide 5-seed ensemble | 0.3197 | 0.7633 | 0.6251 |
+| **NDT-lite, stability-tuned 192-wide 7-seed ensemble** | **0.3229** | **0.7693** | **0.6368** |
 
 **Takeaways**
 
@@ -104,7 +106,7 @@ Local evaluation against the public NLB test target HDF5:
 - RRR and lagged PCA tie on `co-bps` within `~0.002`. The discriminator is `vel R²`, where lagged PCA's unsupervised bottleneck captures more behaviour-aligned structure.
 - An earlier version of this repo reported `lagged_ridge_direct ≈ −0.43 co-bps`; that number was a clipped-Gaussian rate-readout artefact, not a model failure. Full writeup: [`docs/output_head_postmortem.md`](docs/output_head_postmortem.md).
 
-### Headline model config
+### Linear benchmark config
 
 Config: [`configs/mc_maze_lagged_pca.yaml`](configs/mc_maze_lagged_pca.yaml) · family: `lagged_pca_latent_regression` · readout: `log_link` (`log_offset=0.001`) · input transform: `sqrt_zscore` · `n_components=20` · `ridge_alpha=0.1` · `history_bins`: `5` (reference) → `9` (selected).
 
@@ -167,7 +169,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full pipeline.
 - The neural path is still a compact NDT-style baseline, not a full reproduction of the strongest NLB leaderboard systems.
 - The public-test target is local and reproducible because EvalAI submissions are closed; it should be treated as a frozen benchmark artifact, not a live leaderboard submission.
 
-Most justified next step for a measurable achievement: push the NDT-lite path from `0.3121` toward old NDT-class `>0.32 co-bps` through validation-led tuning. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
+The current measurable achievement is a validation-selected NDT-lite run that crosses the old NDT-class `~0.32 co-bps` public-test level locally. The next useful step is probably a more faithful NDT/STNDT-style neuron-time architecture, not blind ensemble scaling. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
 
 ## Citation
 
