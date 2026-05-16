@@ -5,6 +5,7 @@ import inspect
 from nlb_project.model_registry import get_spec
 from nlb_project.models.ndt_factorized import fit_predict_ndt_factorized
 from nlb_project.models.ndt_lite import fit_predict_ndt_lite
+from nlb_project.models.stndt_lite import fit_predict_stndt_lite
 
 
 def _assert_registry_param_names_match_fit_predict_signature(model_type, predict) -> None:
@@ -37,3 +38,7 @@ def test_ndt_factorized_registry_param_names_match_fit_predict_signature() -> No
     _assert_registry_param_names_match_fit_predict_signature(
         "ndt_factorized", fit_predict_ndt_factorized
     )
+
+
+def test_stndt_lite_registry_param_names_match_fit_predict_signature() -> None:
+    _assert_registry_param_names_match_fit_predict_signature("stndt_lite", fit_predict_stndt_lite)

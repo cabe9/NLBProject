@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml/badge.svg)](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml)
 
-This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The linear baseline shows why short neural history matters; the NDT-lite transformer path now reaches `0.3229 co-bps` on the local public-test target with a stability-tuned 7-seed ensemble, all scored through the official `nlb_tools` evaluation code.
+This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The linear baseline shows why short neural history matters; the STNDT-lite neural path now reaches `0.3302 co-bps` on the local public-test target with a validation-selected 5-seed ensemble, all scored through the official `nlb_tools` evaluation code.
 
 ## Start here in 10 minutes
 
@@ -54,8 +54,8 @@ and run the current headline config:
 ```bash
 python -m pip install -e '.[dev,neural]'
 nlb-evaluate-public-test \
-  --config configs/benchmarks/mc_maze_ndt_lite_192_stability_ensemble_sweep.yaml \
-  --output-dir results/public_test/mc_maze_ndt_lite_192_stability_7seed
+  --config configs/benchmarks/mc_maze_stndt_lite_ensemble_sweep.yaml \
+  --output-dir results/public_test/mc_maze_stndt_lite_5seed
 ```
 
 Where outputs appear:
@@ -70,7 +70,7 @@ What success looks like:
 - A full run prints reference/selected `co-bps` and writes files under `results/mc_maze/`.
 - `make portfolio-artifacts` finishes with no diff in tracked files when nothing changed scientifically.
 
-## Results at a glance
+## Linear results at a glance
 
 Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full table: [`results/benchmark_runs/model_comparison.md`](results/benchmark_runs/model_comparison.md). Source `metrics.csv` files: [`results/benchmark_runs/`](results/benchmark_runs/). Notebook walkthrough: [nbviewer render](https://nbviewer.org/github/cabe9/NLBProject/blob/master/notebooks/results_walkthrough.ipynb) ([source notebook](notebooks/results_walkthrough.ipynb)).
 
@@ -98,7 +98,8 @@ Local evaluation against the public NLB test target HDF5:
 | NDT-lite, wider 5-seed ensemble | 0.3004 | 0.7222 | 0.5601 |
 | NDT-lite, tuned 192-wide 5-seed ensemble | 0.3121 | 0.7343 | 0.6116 |
 | NDT-lite, stability-tuned 192-wide 5-seed ensemble | 0.3197 | 0.7633 | 0.6251 |
-| **NDT-lite, stability-tuned 192-wide 7-seed ensemble** | **0.3229** | **0.7693** | **0.6368** |
+| NDT-lite, stability-tuned 192-wide 7-seed ensemble | 0.3229 | 0.7693 | 0.6368 |
+| **STNDT-lite, spatiotemporal 5-seed ensemble** | **0.3302** | **0.8138** | **0.6441** |
 
 **Takeaways**
 
@@ -166,10 +167,10 @@ See [`docs/architecture.md`](docs/architecture.md) for the full pipeline.
 ## Limitations and next step
 
 - Only one dataset (`mc_maze`) is fully packaged here; the comparison set is intentionally small.
-- The neural path is still a compact NDT-style baseline, not a full reproduction of the strongest NLB leaderboard systems.
+- The neural path is still a compact STNDT-inspired baseline, not a full reproduction of the strongest NLB leaderboard systems.
 - The public-test target is local and reproducible because EvalAI submissions are closed; it should be treated as a frozen benchmark artifact, not a live leaderboard submission.
 
-The current measurable achievement is a validation-selected NDT-lite run that crosses the old NDT-class `~0.32 co-bps` public-test level locally. The next useful step is probably a more faithful NDT/STNDT-style neuron-time architecture, not blind ensemble scaling. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
+The current measurable achievement is a validation-selected STNDT-lite run that improves past the old NDT-class `~0.32 co-bps` public-test level locally. It remains below the frozen STNDT ensemble target (`0.3862 co-bps`), so the next useful step is improving the spatiotemporal model itself, not blind ensemble scaling. See [`docs/respectable_score_plan.md`](docs/respectable_score_plan.md).
 
 ## Citation
 

@@ -317,3 +317,29 @@ def test_ndt_factorized_sweep_config_loads_without_torch() -> None:
     assert cfg.improvement["n_layers_grid"] == [2]
     assert cfg.improvement["n_latents_grid"] == [4]
     assert cfg.improvement["ensemble_size"] == 1
+
+
+def test_stndt_lite_screen_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_stndt_lite_screen.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "stndt_lite"
+    assert cfg.baseline["d_model"] == 192
+    assert cfg.baseline["spatial_n_heads"] == 4
+    assert cfg.baseline["contrast_loss_weight"] == 0.0
+    assert len(candidates) == 5
+    assert candidates[1][0]["d_model"] == 256
+    assert candidates[2][0]["n_layers"] == 3
+    assert candidates[-1][0]["contrast_loss_weight"] == 0.03
+    assert all(params["ensemble_size"] == 1 for params, _label in candidates)
+
+
+def test_stndt_lite_ensemble_sweep_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_stndt_lite_ensemble_sweep.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "stndt_lite"
+    assert cfg.baseline["n_layers"] == 3
+    assert cfg.baseline["ensemble_size"] == 1
+    assert [params["ensemble_size"] for params, _label in candidates] == [1, 5]
+    assert all(params["contrast_loss_weight"] == 0.0 for params, _label in candidates)

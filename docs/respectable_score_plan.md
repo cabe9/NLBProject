@@ -19,12 +19,12 @@ The current reproducible public-test scores:
 | `MC_Maze 5 ms` public test | NDT-lite, tuned 192-wide 5-seed ensemble | 0.3121 | 0.7343 | 0.6116 |
 | `MC_Maze 5 ms` public test | NDT-lite, stability-tuned 192-wide 5-seed ensemble | 0.3197 | 0.7633 | 0.6251 |
 | `MC_Maze 5 ms` public test | NDT-lite, stability-tuned 192-wide 7-seed ensemble | 0.3229 | 0.7693 | 0.6368 |
+| `MC_Maze 5 ms` public test | STNDT-lite, spatiotemporal 5-seed ensemble | 0.3302 | 0.8138 | 0.6441 |
 
 The lagged-PCA score is useful as a reproducible floor, not as a competitive
-endpoint. The wider NDT-lite ensemble result is the first clearly respectable
-neural-sequence baseline: about `+0.296 co-bps` absolute over the linear
-baseline, and now locally reaches the old NDT-class public-test level. It still
-leaves a clear gap to stronger leaderboard methods.
+endpoint. The STNDT-lite result is the first neural model here to move beyond
+the old NDT-class public-test level: about `+0.303 co-bps` absolute over the
+linear baseline. It still leaves a clear gap to stronger leaderboard methods.
 On the frozen EvalAI `MC_Maze 5 ms` leaderboard, representative co-bps levels are:
 
 | Approximate target | Public method example | co-bps |
@@ -37,9 +37,36 @@ On the frozen EvalAI `MC_Maze 5 ms` leaderboard, representative co-bps levels ar
 EvalAI no longer accepts new submissions, so the achievement target should be
 a reproducible local public-test score, not a new public leaderboard rank.
 
-## Current neural baseline: NDT-lite
+## Current neural baseline: STNDT-lite
 
-The repo now includes a small Neural Data Transformer-style model:
+The current headline model is a compact STNDT-inspired transformer:
+
+- PyTorch model registered as a normal `model_type` (`stndt_lite`).
+- Inputs are held-in spike counts with learned temporal embeddings.
+- A temporal attention branch models population dynamics over time.
+- A neuron-token branch attends across neurons and feeds spatially reweighted
+  population context back into the temporal branch.
+- Training uses Poisson rate prediction on held-out neurons plus masked held-in
+  reconstruction; optional contrastive consistency is implemented but was not
+  selected by validation in the bounded screen.
+- Public-test score is produced by `nlb-evaluate-public-test`, with final fit
+  on `train + val`.
+- The first bounded screen selected `n_layers=3`, `d_model=192`, `dropout=0.05`,
+  and `mask_prob=0.3`: single-seed train/val improved from `0.2437` to
+  `0.2737`. Larger `d_model=256` and the first two contrastive settings trailed
+  the selected no-contrast candidate on validation.
+- Promoting the selected architecture to 5 seeds improved train/val from
+  `0.2737` to `0.3094`, narrowly beating the previous NDT-lite train/val
+  headline (`0.3068`). The single justified public-test run improved from
+  `0.3229` to `0.3302`.
+
+This is a useful score improvement and a better modeling story, not a
+leaderboard-equivalent STNDT reproduction. It remains `0.0560 co-bps` below the
+frozen `STNDT[Ensemble]` public-test target (`0.3862`).
+
+## Previous neural baseline: NDT-lite
+
+The repo also includes a small Neural Data Transformer-style model:
 
 - PyTorch model registered as a normal `model_type` (`ndt_lite`).
 - Inputs are held-in spike counts with learned temporal embeddings.
@@ -89,14 +116,15 @@ The repo now includes a small Neural Data Transformer-style model:
   foundation/guardrail, not a score-improvement path.
 
 The first practical target, `>0.32 co-bps`, is now met locally without tuning
-directly on public-test targets. The next target should be framed as closing
-the gap to stronger leaderboard methods through better modeling, not by
+directly on public-test targets. The next target, `0.3862`, should be framed as
+closing the gap to the frozen STNDT ensemble through better modeling, not by
 claiming a live EvalAI rank. Do not spend more public-test runs on the first
 depth/dropout/cosine schedule sweep, the simple event-embedding sweep, the
-first factorized architecture, or larger ensembles unless a later train/val run
-beats the current `0.3068` train/val result by a meaningful margin.
+first factorized architecture, contrastive settings from the first STNDT-lite
+screen, or larger ensembles unless a later train/val run beats the current
+`0.3094` STNDT-lite train/val result by a meaningful margin.
 
-Run the initial NDT-lite config with:
+Run the neural score configs with:
 
 ```bash
 python -m pip install -e '.[dev,neural]'
@@ -160,6 +188,16 @@ nlb-evaluate-public-test \
 
 nlb-run-experiment \
   --config configs/benchmarks/mc_maze_ndt_factorized_sweep.yaml
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_stndt_lite_screen.yaml
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_stndt_lite_ensemble_sweep.yaml
+
+nlb-evaluate-public-test \
+  --config configs/benchmarks/mc_maze_stndt_lite_ensemble_sweep.yaml \
+  --output-dir results/public_test/mc_maze_stndt_lite_5seed
 ```
 
 ### Bounded experiment brief (tooling / lighter models)
@@ -175,14 +213,15 @@ Reserve architecture choices (causal attention, schedules, new objectives) and m
 
 ## Why not only scale ensembles?
 
-The current best model is now a compact NDT-style transformer, not the older
-lagged-PCA baseline. Pure ensemble scaling helped once validation supported it:
-the stability-tuned 7-seed model crossed `0.32` locally. Past this point,
-larger ensembles are likely to be a poor tradeoff unless train/val improves
-clearly first. The most useful next work is a more faithful NDT/STNDT-style
-architecture. SSM/Mamba-style temporal mixers are worth considering later, but
-the `mc_maze` sequences are short enough that the current gap is unlikely to be
-mostly a long-context efficiency problem.
+The current best model is now a compact STNDT-inspired transformer, not the
+older lagged-PCA baseline. Pure ensemble scaling helped only after validation
+supported it, and the STNDT-lite 5-seed run already used that gate. Past this
+point, larger ensembles are likely to be a poor tradeoff unless train/val
+improves clearly first. The most useful next work is a higher-capacity
+spatiotemporal model with better neuron identity handling and a more faithful
+masked-modeling objective. SSM/Mamba-style temporal mixers are worth considering
+later, but the `mc_maze` sequences are short enough that the current gap is
+unlikely to be mostly a long-context efficiency problem.
 
 ## References
 
