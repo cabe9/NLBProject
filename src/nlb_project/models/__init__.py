@@ -8,6 +8,7 @@ from .ndt_factorized import fit_predict_ndt_factorized
 from .ndt_lite import fit_predict_ndt_lite
 from .pca_latent_regression import fit_predict_pca_latent_regression
 from .ridge_direct import fit_predict_ridge_direct
+from .stndt_axial import fit_predict_stndt_axial
 from .stndt_lite import fit_predict_stndt_lite
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "fit_predict_ndt_lite",
     "fit_predict_pca_latent_regression",
     "fit_predict_ridge_direct",
+    "fit_predict_stndt_axial",
     "fit_predict_stndt_lite",
 ]

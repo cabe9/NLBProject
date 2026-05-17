@@ -343,3 +343,18 @@ def test_stndt_lite_ensemble_sweep_config_loads_without_torch() -> None:
     assert cfg.baseline["ensemble_size"] == 1
     assert [params["ensemble_size"] for params, _label in candidates] == [1, 5]
     assert all(params["contrast_loss_weight"] == 0.0 for params, _label in candidates)
+
+
+def test_stndt_axial_screen_config_loads_without_torch() -> None:
+    cfg = load_config("configs/benchmarks/mc_maze_stndt_axial_screen.yaml")
+    candidates = list(iter_cv_candidates(get_spec(cfg.model_type), cfg))
+
+    assert cfg.model_type == "stndt_axial"
+    assert cfg.baseline["d_model"] == 64
+    assert cfg.baseline["batch_size"] == 32
+    assert cfg.baseline["spatial_n_heads"] == 4
+    assert cfg.baseline["n_spatial_latents"] == 16
+    assert len(candidates) == 1
+    assert candidates[0][0]["n_layers"] == 1
+    assert candidates[0][0]["n_spatial_latents"] == 16
+    assert all(params["ensemble_size"] == 1 for params, _label in candidates)

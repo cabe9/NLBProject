@@ -64,6 +64,24 @@ This is a useful score improvement and a better modeling story, not a
 leaderboard-equivalent STNDT reproduction. It remains `0.0560 co-bps` below the
 frozen `STNDT[Ensemble]` public-test target (`0.3862`).
 
+## Axial STNDT guardrail
+
+The repo also includes a more explicit neuron-identity architecture:
+
+- PyTorch model registered as `model_type: stndt_axial`.
+- Uses held-in and held-out neuron embeddings, per-time spatial latent
+  cross-attention over held-in neurons, temporal population attention, a
+  learned mask token for held-in reconstruction, and held-out neuron query
+  decoding.
+- A direct all-pairs neuron-attention version was too slow for the bounded
+  screen, so the committed version uses spatial latents to make the probe
+  tractable.
+- The first bounded mc_maze probe did **not** justify promotion: CV mean was
+  `-0.0024 co-bps`, and the completed train/val artifact in
+  `results/benchmark_runs/stndt_axial_screen/metrics.csv` scored `-0.3446`
+  selected co-bps. Do not ensemble it or run public-test without a new
+  train/val result that beats the current `0.3094` STNDT-lite gate.
+
 ## Previous neural baseline: NDT-lite
 
 The repo also includes a small Neural Data Transformer-style model:
@@ -120,9 +138,10 @@ directly on public-test targets. The next target, `0.3862`, should be framed as
 closing the gap to the frozen STNDT ensemble through better modeling, not by
 claiming a live EvalAI rank. Do not spend more public-test runs on the first
 depth/dropout/cosine schedule sweep, the simple event-embedding sweep, the
-first factorized architecture, contrastive settings from the first STNDT-lite
-screen, or larger ensembles unless a later train/val run beats the current
-`0.3094` STNDT-lite train/val result by a meaningful margin.
+first factorized architecture, the first axial STNDT probe, contrastive
+settings from the first STNDT-lite screen, or larger ensembles unless a later
+train/val run beats the current `0.3094` STNDT-lite train/val result by a
+meaningful margin.
 
 Run the neural score configs with:
 
@@ -198,6 +217,9 @@ nlb-run-experiment \
 nlb-evaluate-public-test \
   --config configs/benchmarks/mc_maze_stndt_lite_ensemble_sweep.yaml \
   --output-dir results/public_test/mc_maze_stndt_lite_5seed
+
+nlb-run-experiment \
+  --config configs/benchmarks/mc_maze_stndt_axial_screen.yaml
 ```
 
 ### Bounded experiment brief (tooling / lighter models)
@@ -217,11 +239,14 @@ The current best model is now a compact STNDT-inspired transformer, not the
 older lagged-PCA baseline. Pure ensemble scaling helped only after validation
 supported it, and the STNDT-lite 5-seed run already used that gate. Past this
 point, larger ensembles are likely to be a poor tradeoff unless train/val
-improves clearly first. The most useful next work is a higher-capacity
-spatiotemporal model with better neuron identity handling and a more faithful
-masked-modeling objective. SSM/Mamba-style temporal mixers are worth considering
-later, but the `mc_maze` sequences are short enough that the current gap is
-unlikely to be mostly a long-context efficiency problem.
+improves clearly first. The first axial neuron-identity probe was the right
+idea to test, but its validation result says the current implementation is not
+the path to `0.3862`. The next useful work should be narrower: inspect why
+STNDT-lite succeeds while the axial decoder collapses, then try one fix that
+preserves the STNDT-lite temporal backbone instead of replacing the whole
+readout stack. SSM/Mamba-style temporal mixers are worth considering later, but
+the `mc_maze` sequences are short enough that the current gap is unlikely to be
+mostly a long-context efficiency problem.
 
 ## References
 
