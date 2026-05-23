@@ -12,12 +12,16 @@ $RunName = "stndt_lite_cd_schedule_depth_overnight_screen"
 $OutDir = Join-Path $RepoRoot "results\benchmark_runs\$RunName"
 $Exe = Join-Path $VenvRoot "Scripts\nlb-run-experiment.exe"
 $ResolvedConfig = Join-Path $RepoRoot $ConfigPath
+$DefaultDataRoot = Join-Path $RepoRoot "data\raw"
 
 if (-not (Test-Path -LiteralPath $Exe)) {
     throw "Missing experiment entrypoint: $Exe"
 }
 if (-not (Test-Path -LiteralPath $ResolvedConfig)) {
     throw "Missing config: $ResolvedConfig"
+}
+if (-not $env:NLB_DATA_DIR -and (Test-Path -LiteralPath $DefaultDataRoot)) {
+    $env:NLB_DATA_DIR = $DefaultDataRoot
 }
 
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
@@ -32,6 +36,7 @@ $metadata = @(
     "repo_root=$RepoRoot",
     "config=$ConfigPath",
     "entrypoint=$Exe",
+    "nlb_data_dir=$env:NLB_DATA_DIR",
     "timeout_seconds=$TimeoutSeconds",
     "started_local=$(Get-Date -Format o)",
     "stdout=$Stdout",
