@@ -1,0 +1,59 @@
+model_type: ndt_lite
+dataset_name: mc_maze
+data_path: null
+data_prefix: "*full"
+bin_size_ms: 5
+train_split: train
+eval_split: val
+include_psth: false
+log_offset: 0.001
+seed: 0
+skip_fields:
+  - hand_pos
+  - cursor_pos
+  - eye_pos
+  - muscle_vel
+  - muscle_len
+  - joint_vel
+  - joint_ang
+  - force
+baseline:
+  d_model: 64
+  n_layers: 2
+  n_heads: 4
+  dropout: 0.1
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  batch_size: 64
+  max_epochs: 40
+  patience: 6
+  mask_prob: 0.2
+  heldin_loss_weight: 0.2
+  validation_fraction: 0.1
+  input_transform: sqrt_zscore
+  seed: 0
+  lr_schedule: constant
+  neuron_embedding_scale: 0.0
+  ensemble_size: 1
+  device: auto
+improvement:
+  cv_folds: 2
+  d_model_grid: [64]
+  n_layers_grid: [2]
+  dropout_grid: [0.1]
+  learning_rate_grid: [0.001]
+  mask_prob_grid: [0.2]
+  n_heads: 4
+  lr_schedule_grid: [constant]
+  neuron_embedding_scale_grid: [0.0]
+  weight_decay: 0.0001
+  batch_size: 64
+  max_epochs: 40
+  patience: 6
+  heldin_loss_weight: 0.2
+  validation_fraction: 0.1
+  input_transform: sqrt_zscore
+  seed: 0
+  ensemble_size: 3
+  device: auto
+output_dir: results/benchmark_runs/ndt_lite_ensemble

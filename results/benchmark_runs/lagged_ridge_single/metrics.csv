@@ -1,0 +1,3 @@
+model,model_type,co-bps,vel R2,psth R2,params
+baseline,lagged_ridge_direct,0.021549655673939006,0.1985591038533539,,"{""history_bins"": 5, ""input_transform"": ""sqrt"", ""log_offset"": 0.001, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"
+improved,lagged_ridge_direct,0.021549655673939006,0.1985591038533539,,"{""history_bins"": 5, ""input_transform"": ""sqrt"", ""log_offset"": 0.001, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"

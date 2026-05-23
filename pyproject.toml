@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nlb-project"
+version = "0.1.0"
+description = "Reproducible NLB'21 mc_maze modeling pipeline with tracked benchmark artifacts"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+license = { text = "MIT" }
+authors = [{name = "Caleb Telander"}]
+keywords = ["neuroscience", "neural-decoding", "machine-learning", "time-series", "benchmarking"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "numpy>=1.24,<2",
+  "pandas>=1.3,<3",
+  "scipy>=1.10",
+  "scikit-learn>=1.3",
+  "h5py>=3.9",
+  "PyYAML>=6.0",
+  "nlb-tools==0.0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/cabe9/NLBProject"
+Repository = "https://github.com/cabe9/NLBProject"
+Issues = "https://github.com/cabe9/NLBProject/issues"
+
+[project.scripts]
+nlb-run-experiment = "nlb_project.cli.run_experiment:main"
+nlb-get-data = "nlb_project.cli.get_data:main"
+nlb-generate-portfolio-artifacts = "nlb_project.cli.generate_portfolio_artifacts:main"
+nlb-verify-results = "nlb_project.cli.verify_results:main"
+nlb-get-public-eval-data = "nlb_project.cli.get_public_eval_data:main"
+nlb-evaluate-public-test = "nlb_project.cli.evaluate_public_test:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pip-tools>=7.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+neural = [
+  "torch>=2.2",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["results", "data", ".pytest_cache"]
+
+[tool.ruff.lint]
+# Pyflakes, pycodestyle, pyupgrade, isort, bugbear, comprehension tidying.
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+# Line-length violations are mostly in long log/error strings and comments
+# that would read worse split; keep the hard lints (E/F/W) strict otherwise.
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+pretty = true
+warn_return_any = false
+warn_unused_ignores = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+ignore_missing_imports = true
+disable_error_code = ["import-untyped"]
+files = ["src", "scripts", "tests"]
+exclude = "(^data/|^results/)"

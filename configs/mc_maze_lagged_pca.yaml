@@ -1,0 +1,38 @@
+model_type: lagged_pca_latent_regression
+dataset_name: mc_maze
+data_path: null
+data_prefix: "*full"
+bin_size_ms: 5
+train_split: train
+eval_split: val
+include_psth: true
+log_offset: 0.001
+seed: 0
+skip_fields:
+  - hand_pos
+  - cursor_pos
+  - eye_pos
+  - muscle_vel
+  - muscle_len
+  - joint_vel
+  - joint_ang
+  - force
+baseline:
+  history_bins: 5
+  input_transform: sqrt_zscore
+  n_components: 20
+  ridge_alpha: 0.1
+  # Rate readout: Ridge regresses on log(count + log_offset); predictions are
+  # exp()'d at inference. This is the co-bps-correct default. Set to "linear"
+  # to reproduce the legacy Gaussian-ridge-on-counts behaviour for ablations.
+  output_head: log_link
+  log_offset: 0.001
+improvement:
+  cv_folds: 3
+  history_bins_grid: [9]
+  n_components_grid: [20]
+  ridge_alpha_grid: [0.1]
+  input_transform: sqrt_zscore
+  output_head: log_link
+  log_offset: 0.001
+output_dir: results/mc_maze

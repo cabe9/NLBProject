@@ -1,0 +1,3 @@
+model,model_type,co-bps,vel R2,psth R2,params
+baseline,lagged_pca_latent_regression,0.016619819493858642,0.24001313028172938,,"{""history_bins"": 5, ""input_transform"": ""sqrt_zscore"", ""log_offset"": 0.001, ""n_components"": 20, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"
+improved,lagged_pca_latent_regression,0.02664264173542745,0.36478222217677275,,"{""history_bins"": 9, ""input_transform"": ""sqrt_zscore"", ""log_offset"": 0.001, ""n_components"": 20, ""output_head"": ""log_link"", ""ridge_alpha"": 0.1}"
