@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml/badge.svg)](https://github.com/cabe9/NLBProject/actions/workflows/ci.yml)
 
-This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The core result is a validation-selected 4-layer STNDT-lite model (CD-style objective with temporal identity + spike weighting, 5-seed ensemble) that reaches **`0.3795 co-bps`** on the local public-test target, scored through the official `nlb_tools` evaluation code. Scores are local reproducible public-test evaluations against the frozen NLB target HDF5, not live EvalAI ranks.
+This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The core result is a validation-selected mixed STNDT-lite ensemble (4-layer `learning_rate=0.0013` 5-seed averaged with 5-layer `dropout=0.08` 5-seed) that reaches **`0.3830 co-bps`** on the local public-test target, scored through the official `nlb_tools` evaluation code. Scores are local reproducible public-test evaluations against the frozen NLB target HDF5, not live EvalAI ranks.
 
 Future coding agents should read [`AGENTS.md`](AGENTS.md) before changing
 models or benchmark configs; it records internal score gates, failed
@@ -62,6 +62,13 @@ nlb-evaluate-public-test \
   --output-dir results/public_test/mc_maze_stndt_lite_depth4_mask06_5seed
 ```
 
+For the current mixed-ensemble public-test headline:
+
+```bash
+nlb-evaluate-ensemble-public-test \
+  --config configs/benchmarks/mc_maze_stndt_lite_diverse_lr0013_depth5_public.yaml
+```
+
 Where outputs appear:
 
 - Test-only integration artifacts are created under a temporary test directory.
@@ -101,7 +108,8 @@ Local evaluation against the public NLB test target HDF5:
 | STNDT-lite, temporal identity + spike-weighted 5-seed ensemble | 0.3413 | 0.8451 | -1.8622 |
 | STNDT-lite, Screen C CD-reconcile winner 5-seed ensemble | 0.3649 | 0.8911 | 0.6548 |
 | STNDT-lite, 4-layer constant mask 0.5 5-seed ensemble | 0.3742 | 0.8949 | 0.6566 |
-| **STNDT-lite, 4-layer constant mask 0.6 5-seed ensemble** | **0.3795** | **0.8978** | **0.6354** |
+| STNDT-lite, 4-layer constant mask 0.6 5-seed ensemble | 0.3795 | 0.8978 | 0.6354 |
+| **STNDT-lite, mixed lr0.0013/depth5 10-member ensemble** | **0.3830** | **0.9053** | **0.6390** |
 
 See [`docs/results.md`](docs/results.md) for the concise public-facing results
 table and [`AGENTS.md`](AGENTS.md) for internal experiment history.
@@ -176,7 +184,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full pipeline.
 - The neural path is still a compact STNDT-inspired baseline, not a full reproduction of the strongest NLB leaderboard systems.
 - The public-test target is local and reproducible because EvalAI submissions are closed; it should be treated as a frozen benchmark artifact, not a live leaderboard submission.
 
-The current measurable achievement is a validation-selected 4-layer STNDT-lite model that improves past the prior Screen C public-test level (`0.3649 co-bps`) and reaches **`0.3795 co-bps`** locally. It remains below the frozen STNDT ensemble target (`0.3862 co-bps`), so the next useful step is further validation-gated model changes, not blind ensemble scaling. See [`docs/results.md`](docs/results.md).
+The current measurable achievement is a validation-selected mixed STNDT-lite ensemble that improves past the prior 4-layer public-test level (`0.3795 co-bps`) and reaches **`0.3830 co-bps`** locally. It remains below the frozen STNDT ensemble target (`0.3862 co-bps`), so the next useful step is further validation-gated model changes, not blind public-test probing. See [`docs/results.md`](docs/results.md).
 
 ## Citation
 

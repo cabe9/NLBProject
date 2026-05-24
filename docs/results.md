@@ -7,10 +7,11 @@ ranks.
 
 ## Headline
 
-The current best model is `stndt_lite` with the 4-layer constant mask 0.6
-recipe: higher mask probability, full held-in loss weight, mask token, temporal
-neuron-event identity, spike-weighted masked reconstruction, and a
-validation-selected 5-seed ensemble.
+The current best model is a validation-selected mixed `stndt_lite` ensemble:
+a 4-layer `learning_rate=0.0013` 5-seed ensemble averaged with a 5-layer
+`dropout=0.08` 5-seed ensemble. Both components keep the mask 0.6 objective,
+full held-in loss weight, mask token, temporal neuron-event identity, and
+spike-weighted masked reconstruction.
 
 | Model | co-bps | vel R² | psth R² |
 |---|---:|---:|---:|
@@ -20,16 +21,17 @@ validation-selected 5-seed ensemble.
 | STNDT-lite, temporal identity + spike-weighted 5-seed ensemble | 0.3413 | 0.8451 | -1.8622 |
 | STNDT-lite, Screen C CD-reconcile winner 5-seed ensemble | 0.3649 | 0.8911 | 0.6548 |
 | STNDT-lite, 4-layer constant mask 0.5 5-seed ensemble | 0.3742 | 0.8949 | 0.6566 |
-| **STNDT-lite, 4-layer constant mask 0.6 5-seed ensemble** | **0.3795** | **0.8978** | **0.6354** |
+| STNDT-lite, 4-layer constant mask 0.6 5-seed ensemble | 0.3795 | 0.8978 | 0.6354 |
+| **STNDT-lite, mixed lr0.0013/depth5 10-member ensemble** | **0.3830** | **0.9053** | **0.6390** |
 
 ## Context
 
 The lagged PCA baseline is a reproducible floor. The current neural result is
-about `+0.353 co-bps` above that baseline and above the prior Screen C
-public-test level (`0.3649 co-bps`).
+about `+0.356 co-bps` above that baseline and above the prior 4-layer mask 0.6
+public-test level (`0.3795 co-bps`).
 
 The frozen `MC_Maze 5 ms` rank-1 leaderboard reference is `0.3862 co-bps`
-(`STNDT[Ensemble]`). This repo's current `0.3795 co-bps` result is a meaningful
+(`STNDT[Ensemble]`). This repo's current `0.3830 co-bps` result is a meaningful
 local benchmark improvement, but it should not be described as a live
 leaderboard rank.
 
@@ -41,4 +43,6 @@ nlb-get-public-eval-data --out data/eval/eval_data_test.h5
 nlb-evaluate-public-test \
   --config configs/benchmarks/mc_maze_stndt_lite_depth4_mask06_5seed_public.yaml \
   --output-dir results/public_test/mc_maze_stndt_lite_depth4_mask06_5seed
+nlb-evaluate-ensemble-public-test \
+  --config configs/benchmarks/mc_maze_stndt_lite_diverse_lr0013_depth5_public.yaml
 ```
