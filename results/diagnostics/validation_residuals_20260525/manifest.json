@@ -1,0 +1,23 @@
+{
+  "dataset_name": "mc_maze",
+  "bin_size_ms": 5,
+  "reference": "current_pair",
+  "predictions": [
+    {
+      "name": "current_pair",
+      "path": "results\\benchmark_runs\\stndt_lite_diverse_ensemble_screen\\predictions\\improved_predictions.h5"
+    },
+    {
+      "name": "screen_k_width",
+      "path": "results\\benchmark_runs\\stndt_lite_diverse_screen_k_crossed_member\\predictions\\improved_predictions.h5"
+    },
+    {
+      "name": "screen_l_spike125",
+      "path": "results\\benchmark_runs\\stndt_lite_diverse_screen_l_seed101_robust_member\\predictions\\improved_predictions.h5"
+    },
+    {
+      "name": "screen_m_spike125",
+      "path": "results\\benchmark_runs\\stndt_lite_diverse_screen_m_training_dynamics\\predictions\\improved_predictions.h5"
+    }
+  ]
+}
