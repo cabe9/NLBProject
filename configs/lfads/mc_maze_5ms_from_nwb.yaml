@@ -1,0 +1,24 @@
+# Placeholder for a future 5 ms LFADS track built from local NWB via
+# scripts/prepare_lfads_mc_maze.py --bin-size-ms 5 --source nwb
+#
+# Dimensions are data-dependent; re-run prepare and update this file after
+# scripts/prepare_lfads_mc_maze.py writes data/lfads/mc_maze_5ms_val_manifest.json
+
+dataset: mc_maze
+bin_size_ms: 5
+bin_size_label: "5 ms — align with STNDT-lite pipeline; not comparable to 20 ms LFADS reference without relabeling"
+
+model:
+  encod_data_dim: null  # fill from manifest
+  encod_seq_len: null
+  recon_seq_len: null
+  readout_out_features: null
+  batch_size_smoke: 32
+  batch_size_full: 32
+
+datamodule:
+  datafile: data/lfads/mc_maze_5ms_val.h5
+
+notes: >
+  Requires NLB_DATA_DIR or --data-path. Update lfads-torch model YAML readout
+  out_features and seq lengths to match manifest before any validation training.

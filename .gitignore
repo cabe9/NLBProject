@@ -36,3 +36,7 @@ _transcript_sr/
 
 # Local agent guidance; keep machine-specific.
 AGENTS.md
+
+# LFADS baseline (isolated third-party clone + local envs)
+external/lfads-torch/
+.venv-lfads*/

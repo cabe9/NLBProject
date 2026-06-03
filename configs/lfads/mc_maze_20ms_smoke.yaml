@@ -1,0 +1,31 @@
+# Project-side notes for LFADS smoke runs (not loaded automatically by Hydra).
+# scripts/run_lfads_mc_maze_smoke.py applies the override keys listed below.
+
+dataset: mc_maze
+bin_size_ms: 20
+bin_size_label: "20 ms — LFADS upstream reference; not comparable to 5 ms STNDT-lite headline"
+
+# lfads-torch configs/model/nlb_mc_maze.yaml (upstream, after clone)
+model:
+  encod_data_dim: 137
+  encod_seq_len: 35
+  recon_seq_len: 45
+  readout_out_features: 182
+  batch_size_smoke: 4
+  batch_size_full: 64  # conservative for RTX 3080 on 5 ms; 20 ms often uses 256 upstream
+
+datamodule:
+  datafile: data/lfads/mc_maze_20ms_val.h5
+  datafile_smoke_subset: data/lfads/mc_maze_20ms_val_smoke.h5
+  batch_keys: [behavior]
+  attr_keys: [psth, train_cond_idx, valid_cond_idx, train_decode_mask, valid_decode_mask]
+
+hydra_overrides:
+  datamodule: nlb_mc_maze
+  model: nlb_mc_maze
+  trainer.max_epochs: 2
+  datamodule.batch_size: 32
+  callbacks.early_stopping.patience: 1000
+  posterior_sampling.num_samples: 2
+
+train_val_source: NLB trial splits train / val (lfads-torch bundled HDF5)
