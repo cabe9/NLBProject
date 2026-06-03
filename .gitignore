@@ -25,6 +25,12 @@ results/benchmark_runs/*/*
 !results/benchmark_runs/model_diagnostics.svg
 !results/benchmark_runs/experiment_log.md
 results/public_test/
+results/lfads_smoke/
+results/diagnostics/
+
+# LFADS baseline (isolated third-party clone + local envs)
+external/lfads-torch/
+.venv-lfads*/
 
 # Local run logs (machine-specific)
 *.log
