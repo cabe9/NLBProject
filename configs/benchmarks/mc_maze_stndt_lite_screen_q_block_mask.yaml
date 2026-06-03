@@ -1,0 +1,145 @@
+# Screen Q: block/span masking objective vs per-element Bernoulli control.
+# Validation-only. Do not public-test from this screen alone.
+#
+# Staged gates:
+#   Stage A: best block_time must beat bernoulli control by >= +0.003 train/val
+#            co-bps or stop (no ensemble/sanity/public-test).
+#   Stage B: if A clears, test winner as third diverse member (lr0013 + depth5);
+#            require mean train/val >= 0.3765 with >= 2/3 seeds above gate.
+#   Stage C: if B clears, 3-seed sanity (0/101/202); mean >= 0.3785 with >= 2/3
+#            above 0.3765 before any public-test.
+#   At most one public-test after Stage C and explicit user approval.
+model_type: stndt_lite
+dataset_name: mc_maze
+data_path: null
+data_prefix: "*full"
+bin_size_ms: 5
+train_split: train
+eval_split: val
+include_psth: false
+log_offset: 0.001
+seed: 0
+skip_fields:
+  - hand_pos
+  - cursor_pos
+  - eye_pos
+  - muscle_vel
+  - muscle_len
+  - joint_vel
+  - joint_ang
+  - force
+baseline:
+  d_model: 192
+  n_layers: 3
+  n_heads: 4
+  spatial_n_heads: 4
+  dropout: 0.05
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  batch_size: 64
+  max_epochs: 60
+  patience: 10
+  mask_prob: 0.3
+  heldin_loss_weight: 0.3
+  validation_fraction: 0.05
+  input_transform: sqrt_zscore
+  seed: 0
+  lr_schedule: constant
+  contrast_loss_weight: 0.0
+  contrast_mask_prob: 0.05
+  contrast_temperature: 0.07
+  ensemble_size: 1
+  device: auto
+improvement:
+  select_on_full_val_all_candidates: true
+  cv_folds: 2
+  n_heads: 4
+  spatial_n_heads: 4
+  weight_decay: 0.0001
+  batch_size: 64
+  validation_fraction: 0.05
+  input_transform: sqrt_zscore
+  contrast_mask_prob: 0.05
+  contrast_temperature: 0.07
+  device: auto
+  candidates:
+    # Q1 - bernoulli control (current default masking).
+    - {
+        d_model: 192,
+        n_layers: 4,
+        dropout: 0.05,
+        learning_rate: 0.0013,
+        mask_prob: 0.6,
+        mask_mode: bernoulli,
+        heldin_loss_weight: 1.0,
+        lr_schedule: constant,
+        contrast_loss_weight: 0.0,
+        temporal_identity_scale: 0.05,
+        spike_loss_weight: 1.0,
+        use_mask_token: true,
+        max_epochs: 60,
+        patience: 10,
+        ensemble_size: 5,
+        seed: 0,
+      }
+    # Q2 - block_time span 2 bins.
+    - {
+        d_model: 192,
+        n_layers: 4,
+        dropout: 0.05,
+        learning_rate: 0.0013,
+        mask_prob: 0.6,
+        mask_mode: block_time,
+        span_length: 2,
+        heldin_loss_weight: 1.0,
+        lr_schedule: constant,
+        contrast_loss_weight: 0.0,
+        temporal_identity_scale: 0.05,
+        spike_loss_weight: 1.0,
+        use_mask_token: true,
+        max_epochs: 60,
+        patience: 10,
+        ensemble_size: 5,
+        seed: 0,
+      }
+    # Q3 - block_time span 4 bins.
+    - {
+        d_model: 192,
+        n_layers: 4,
+        dropout: 0.05,
+        learning_rate: 0.0013,
+        mask_prob: 0.6,
+        mask_mode: block_time,
+        span_length: 4,
+        heldin_loss_weight: 1.0,
+        lr_schedule: constant,
+        contrast_loss_weight: 0.0,
+        temporal_identity_scale: 0.05,
+        spike_loss_weight: 1.0,
+        use_mask_token: true,
+        max_epochs: 60,
+        patience: 10,
+        ensemble_size: 5,
+        seed: 0,
+      }
+    # Q4 - block_time span 8 bins.
+    - {
+        d_model: 192,
+        n_layers: 4,
+        dropout: 0.05,
+        learning_rate: 0.0013,
+        mask_prob: 0.6,
+        mask_mode: block_time,
+        span_length: 8,
+        heldin_loss_weight: 1.0,
+        lr_schedule: constant,
+        contrast_loss_weight: 0.0,
+        temporal_identity_scale: 0.05,
+        spike_loss_weight: 1.0,
+        use_mask_token: true,
+        max_epochs: 60,
+        patience: 10,
+        ensemble_size: 5,
+        seed: 0,
+      }
+output_dir: results/benchmark_runs/stndt_lite_screen_q_block_mask

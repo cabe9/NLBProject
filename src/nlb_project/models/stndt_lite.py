@@ -19,6 +19,36 @@ import numpy as np
 from .ndt_lite import _poisson_loss, _require_torch, _reshape_transform, _resolve_device
 
 
+def sample_block_time_mask(
+    batch_size: int,
+    t_len: int,
+    n_neurons: int,
+    mask_prob: float,
+    span_length: int,
+    *,
+    device: Any,
+) -> Any:
+    """Return a ``[B, T, N]`` bool mask with contiguous time spans masked for all neurons."""
+    torch, _, _ = _require_torch()
+    mask_time = torch.zeros(batch_size, t_len, dtype=torch.bool, device=device)
+    target_bins = max(1, int(round(float(mask_prob) * t_len)))
+    span = max(1, int(span_length))
+    if span >= t_len:
+        mask_time[:] = True
+        return mask_time.unsqueeze(-1).expand(batch_size, t_len, n_neurons)
+
+    max_attempts = max(t_len * 4, 1)
+    for batch_idx in range(batch_size):
+        masked_count = 0
+        attempts = 0
+        while masked_count < target_bins and attempts < max_attempts:
+            start = int(torch.randint(0, t_len - span + 1, (1,), device=device).item())
+            mask_time[batch_idx, start : start + span] = True
+            masked_count = int(mask_time[batch_idx].sum().item())
+            attempts += 1
+    return mask_time.unsqueeze(-1).expand(batch_size, t_len, n_neurons)
+
+
 def _info_nce_loss(torch: Any, functional: Any, z1: Any, z2: Any, temperature: float) -> Any:
     """Symmetric in-batch InfoNCE over two masked views."""
     if z1.shape[0] < 2:
@@ -55,6 +85,7 @@ def _spatiotemporal_transformer_cls(
     dropout: float,
     min_rate: float,
     use_mask_token: bool = False,
+    unit_calibration: bool = False,
 ) -> type:
     """Return ``nn.Module`` subclass; defined after Torch import so it stays optional."""
 
@@ -163,6 +194,12 @@ def _spatiotemporal_transformer_cls(
             if use_mask_token:
                 self.mask_token = nn.Parameter(torch.zeros(n_heldin))
 
+            self.heldout_calib_scale = None
+            self.heldout_calib_bias = None
+            if unit_calibration:
+                self.heldout_calib_scale = nn.Parameter(torch.ones(n_heldout))
+                self.heldout_calib_bias = nn.Parameter(torch.zeros(n_heldout))
+
         def apply_input_mask(self, x, mask):
             """Substitute masked input positions with zero-fill or a learned mask token.
 
@@ -209,6 +246,11 @@ def _spatiotemporal_transformer_cls(
                 heldout_logits = heldout_logits + float(neuron_readout_scale) * torch.einsum(
                     "btd,od->bto", readout, self.heldout_neuron_embed
                 )
+            if self.heldout_calib_scale is not None and self.heldout_calib_bias is not None:
+                heldout_logits = (
+                    heldout_logits * self.heldout_calib_scale[None, None, :]
+                    + self.heldout_calib_bias[None, None, :]
+                )
             heldin = functional.softplus(heldin_logits) + float(min_rate)
             heldout = functional.softplus(heldout_logits) + float(min_rate)
             return heldin, heldout, h
@@ -232,6 +274,8 @@ def fit_predict_stndt_lite(
     max_epochs: int,
     patience: int,
     mask_prob: float,
+    mask_mode: str = "bernoulli",
+    span_length: int = 0,
     heldin_loss_weight: float,
     validation_fraction: float,
     input_transform: str,
@@ -247,6 +291,9 @@ def fit_predict_stndt_lite(
     neuron_readout_dim: int = 0,
     neuron_readout_scale: float = 0.0,
     use_mask_token: bool = False,
+    unit_calibration: bool = False,
+    unit_calibration_scale_reg: float = 1.0,
+    unit_calibration_bias_reg: float = 1.0,
     warmup_epochs: int = 0,
     ensemble_size: int = 1,
     device: str = "auto",
@@ -260,6 +307,12 @@ def fit_predict_stndt_lite(
         raise ValueError("`d_model` must be divisible by `n_heads`")
     if not 0.0 <= mask_prob < 1.0:
         raise ValueError("`mask_prob` must be in [0, 1)")
+    mask_mode = str(mask_mode).lower()
+    if mask_mode not in {"bernoulli", "block_time"}:
+        raise ValueError("`mask_mode` must be one of {'bernoulli', 'block_time'}")
+    span_length = int(span_length)
+    if mask_mode == "block_time" and span_length < 1:
+        raise ValueError("`span_length` must be at least 1 when `mask_mode` is 'block_time'")
     if not 0.0 <= validation_fraction < 1.0:
         raise ValueError("`validation_fraction` must be in [0, 1)")
     if not 0.0 <= contrast_mask_prob < 1.0:
@@ -292,6 +345,13 @@ def fit_predict_stndt_lite(
     if lr_schedule not in {"constant", "cosine"}:
         raise ValueError("`lr_schedule` must be one of {'constant', 'cosine'}")
     use_mask_token = bool(use_mask_token)
+    unit_calibration = bool(unit_calibration)
+    unit_calibration_scale_reg = float(unit_calibration_scale_reg)
+    unit_calibration_bias_reg = float(unit_calibration_bias_reg)
+    if unit_calibration_scale_reg < 0:
+        raise ValueError("`unit_calibration_scale_reg` must be non-negative")
+    if unit_calibration_bias_reg < 0:
+        raise ValueError("`unit_calibration_bias_reg` must be non-negative")
     warmup_epochs = int(warmup_epochs)
     if warmup_epochs < 0:
         raise ValueError("`warmup_epochs` must be non-negative")
@@ -330,6 +390,7 @@ def fit_predict_stndt_lite(
         dropout=float(dropout),
         min_rate=float(min_rate),
         use_mask_token=use_mask_token,
+        unit_calibration=unit_calibration,
     )
 
     x_train = torch.as_tensor(train_x, dtype=torch.float32, device=device_obj)
@@ -407,7 +468,18 @@ def fit_predict_stndt_lite(
             target_hi = y_hi.index_select(0, idx_tensor)
             target_ho = y_ho.index_select(0, idx_tensor)
             if train_mode and mask_prob > 0:
-                mask = torch.rand_like(xb) < float(mask_prob)
+                if mask_mode == "bernoulli":
+                    mask = torch.rand_like(xb) < float(mask_prob)
+                else:
+                    batch_dim, t_len, n_neurons = xb.shape
+                    mask = sample_block_time_mask(
+                        batch_dim,
+                        t_len,
+                        n_neurons,
+                        float(mask_prob),
+                        span_length,
+                        device=xb.device,
+                    )
                 xb_masked = model.apply_input_mask(xb, mask)
                 raw_masked = target_hi.masked_fill(mask, 0.0)
             else:
@@ -440,6 +512,17 @@ def fit_predict_stndt_lite(
                 )
                 loss = loss + contrast_loss_weight * _info_nce_loss(
                     torch, functional, z1, z2, float(contrast_temperature)
+                )
+            if (
+                train_mode
+                and unit_calibration
+                and model.heldout_calib_scale is not None
+                and model.heldout_calib_bias is not None
+            ):
+                scale_err = model.heldout_calib_scale - 1.0
+                loss = loss + float(unit_calibration_scale_reg) * torch.sum(scale_err**2)
+                loss = loss + float(unit_calibration_bias_reg) * torch.sum(
+                    model.heldout_calib_bias**2
                 )
             return loss
 
