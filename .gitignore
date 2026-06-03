@@ -25,6 +25,8 @@ results/benchmark_runs/*/*
 !results/benchmark_runs/model_diagnostics.svg
 !results/benchmark_runs/experiment_log.md
 results/public_test/
+results/lfads_smoke/
+results/diagnostics/
 
 # Local run logs (machine-specific)
 *.log
