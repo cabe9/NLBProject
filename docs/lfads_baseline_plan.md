@@ -20,15 +20,17 @@ existing STNDT-lite stack. This is **not** another STNDT-lite screen.
 3. HDF5 prep + smoke train (checkpoint saved).
 4. **Rate export + NLB validation evaluator** (`scripts/export_lfads_rates.py`,
    `scripts/evaluate_lfads_outputs.py`, `scripts/lfads_nlb_bridge.py`).
-5. **First single-seed 20 ms train/val baseline** (50 epochs, full HDF5) — see
+5. **Single-seed 20 ms train/val baselines** (50 and 100 epochs, full HDF5) — see
    [Completed 20 ms validation baselines](#completed-20-ms-validation-baselines-2026-06-03).
+   Current best: **0.3606 co-bps** @ 100 epochs (`20260603T201838Z`).
 
 ### Next (controlled runs only)
 
-1. Optional **100-epoch** run (same config) if 50-epoch co-bps may still be climbing; export only after train completes.
-2. Optional **batch-size 64** probe if GPU memory allows (faster steps, not a sweep).
+1. Optional **batch-size 64** probe if GPU memory allows (one OOM retry to 32; not a sweep).
+2. Optional **second seed** at 50–100 epochs if reproducibility matters.
 3. **5 ms** NWB path only if fair comparison to STNDT-lite is explicitly required.
-4. **No public-test** until explicit approval; never compare 20 ms scores to the 5 ms headline without bin-size labels.
+4. **No 200-epoch** scaling without a new structural reason (diminishing returns vs 50→100).
+5. **No public-test** until explicit approval; never compare 20 ms scores to the 5 ms headline without bin-size labels.
 
 ## Repository layout
 
@@ -253,26 +255,59 @@ Artifacts:
 - Rates: `lfads_outputs/lfads_output_mc_maze_20ms_val.h5`
 - Eval JSON: `lfads_outputs/lfads_output_mc_maze_20ms_val_nlb_eval.json`
 
+### 100-epoch baseline (current best single-seed, 20 ms)
+
+| Field | Value |
+|-------|-------|
+| Run dir | `results/lfads_smoke/20260603T201838Z/` |
+| Data | `data/lfads/mc_maze_20ms_val.h5` (1721 train / 574 val trials) |
+| Train | 100 epochs, **batch size 32**, ~**31.7 min** wall time, CUDA |
+| Export | **20** posterior samples, ~**20.0 min**; finite `train/valid_output_params` |
+| Issues | No NaNs, no manifest warnings; **PSTH included** in evaluation |
+
+| Metric | Value |
+|--------|------:|
+| co-bps | **0.3606** |
+| fp-bps | 0.2525 |
+| vel R2 | 0.8946 |
+| psth R2 | 0.5818 |
+
+Artifacts:
+
+- Checkpoint: `lfads_run/lightning_checkpoints/98-5247.ckpt` (export used this best ckpt)
+- Rates: `lfads_outputs/lfads_output_mc_maze_20ms_val.h5`
+- Eval JSON: `lfads_outputs/lfads_output_mc_maze_20ms_val_nlb_eval.json`
+
+**vs 50 epochs (`20260603T094126Z`):**
+
+| Metric | Δ (100 − 50) |
+|--------|-------------|
+| co-bps | **+0.0107** (0.3499 → 0.3606) |
+| fp-bps | +0.0123 |
+| vel R2 | −0.0021 (flat / slightly lower) |
+| psth R2 | −0.0025 (flat / slightly lower) |
+
 ### Interpretation
 
 - This is a **valid first LFADS 20 ms validation baseline** on the bundled lfads-torch HDF5 split.
 - The LFADS track is **more than smoke plumbing**: export → NLB evaluate works on full data with PSTH.
-- **0.3499 co-bps (20 ms)** must not be read against **0.3830 (5 ms STNDT-lite)** without matching bin size and data contract.
-- Probe (2 epoch) → baseline (50 epoch) gained ~**+0.15 co-bps**, so loss was still improving; a longer run *may* help, but treat as hypothesis not a sweep mandate.
-- Further work should be **controlled single runs** (fixed seed, one knob at a time), not broad hyperparameter sweeps or uncontrolled overnight loops.
+- **0.3606 co-bps (20 ms, 100 epochs)** is the **current best single-seed** result; **0.3499 (50 epochs)** is the prior reference.
+- Neither must be read against **0.3830 (5 ms STNDT-lite)** without matching bin size and data contract.
+- Probe (2 epoch) → 50 epoch gained ~**+0.15 co-bps**; 50 → 100 gained only **+0.0107 co-bps** while roughly doubling train time — **epoch scaling shows diminishing returns**.
+- **Do not run 200 epochs** without a new structural reason.
+- Further work should be **controlled single runs** (batch-64 probe, optional second seed, or 5 ms path), not broad sweeps or uncontrolled long loops.
 
 ### Recommended next experiments
 
 | Option | Recommendation |
 |--------|----------------|
-| **100 epochs, batch 32** | Reasonable next controlled run if checking whether 0.3499 is still climbing; export with `--num-samples 20` only after training finishes |
-| **batch 64 probe** | Useful if GPU memory allows (faster steps); one OOM retry to 32, no other knobs |
+| **200+ epochs** | No — diminishing returns after 100 vs 50 |
+| **batch 64 probe** | Next meaningful knob if GPU memory allows; one OOM retry to 32 |
+| **Second seed** | Optional reproducibility check at 50–100 epochs |
+| **5 ms LFADS** | Only if fair comparison to STNDT-lite is required |
 | **8-hour / PBT run** | No |
-| **5 ms LFADS** | Later, only if fair comparison to STNDT-lite is required |
 | **Hyperparameter sweep** | Not yet |
 | **Public-test** | No |
-
-Stop after 100 epochs if co-bps barely moves vs 0.3499.
 
 ## Recommended path: 20 ms first, then decide on 5 ms
 
