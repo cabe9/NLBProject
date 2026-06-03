@@ -15,17 +15,20 @@ existing STNDT-lite stack. This is **not** another STNDT-lite screen.
 
 ### Done (smoke + evaluation bridge)
 
-1. Isolated env plan (`lfads-nlb` / `.venv-lfads-nlb`).
+1. Isolated env plan (`lfads-nlb` / `.venv-lfads-nlb`; local env: `.venv-lfads-smoke-test` with `torch 1.13.1+cu117`).
 2. `external/lfads-torch` clone (gitignored).
 3. HDF5 prep + smoke train (checkpoint saved).
 4. **Rate export + NLB validation evaluator** (`scripts/export_lfads_rates.py`,
    `scripts/evaluate_lfads_outputs.py`, `scripts/lfads_nlb_bridge.py`).
+5. **First single-seed 20 ms train/val baseline** (50 epochs, full HDF5) — see
+   [Completed 20 ms validation baselines](#completed-20-ms-validation-baselines-2026-06-03).
 
-### Next (not started here)
+### Next (controlled runs only)
 
-1. One conservative **20 ms** train/val baseline (single seed, limited epochs, no sweep).
-2. Decide whether **5 ms** NWB path is worth the extra format work for STNDT-lite comparability.
-3. Public-test only after full val gate + explicit approval.
+1. Optional **100-epoch** run (same config) if 50-epoch co-bps may still be climbing; export only after train completes.
+2. Optional **batch-size 64** probe if GPU memory allows (faster steps, not a sweep).
+3. **5 ms** NWB path only if fair comparison to STNDT-lite is explicitly required.
+4. **No public-test** until explicit approval; never compare 20 ms scores to the 5 ms headline without bin-size labels.
 
 ## Repository layout
 
@@ -194,13 +197,82 @@ Dataset keys for **20 ms**: `mc_maze_20` → metrics under `mc_maze_20_split`.
 - **Not meaningful performance** — only plumbing verification
 - **psth R2 omitted** on trial subsets when `valid_cond_idx` references full-dataset trial IDs
 
-### Before a real 20 ms train/val baseline
+### First 20 ms train/val baseline (done 2026-06-03)
 
-- [ ] Train on **full** `data/lfads/mc_maze_20ms_val.h5` (not smoke subset)
-- [ ] Export with more posterior samples (e.g. 20–50)
-- [ ] Re-evaluate; expect finite `co-bps` on val (quality TBD, not vs 0.3830)
+- [x] Train on **full** `data/lfads/mc_maze_20ms_val.h5` (not smoke subset)
+- [x] Export with posterior samples (20 on baseline run)
+- [x] Re-evaluate; finite `co-bps` on val — see baseline table below
 - [ ] Optional: rebuild targets from NWB via `make_eval_target_tensors` for exact NLB parity
 - [ ] 5 ms path only if fair STNDT-lite comparison is required
+
+## Completed 20 ms validation baselines (2026-06-03)
+
+All metrics are **20 ms MC_Maze train/val** via `nlb_tools.evaluate` on
+`data/lfads/mc_maze_20ms_val.h5` targets (`mc_maze_20_split`). **Not public-test.**
+**Not comparable** to the STNDT-lite **5 ms** local public-test headline (**0.3830 co-bps**).
+
+Env: `.venv-lfads-smoke-test`, CUDA RTX 3080, `scripts/run_lfads_mc_maze_smoke.py` on full HDF5.
+
+### 2-epoch probe (plumbing + under-trained check)
+
+| Field | Value |
+|-------|-------|
+| Run dir | `results/lfads_smoke/20260603T092356Z/` |
+| Train | 2 epochs, batch 16, full HDF5 |
+| Export / eval | OK (5 posterior samples); alignment OK |
+
+| Metric | Value |
+|--------|------:|
+| co-bps | 0.1978 |
+| fp-bps | 0.1188 |
+| vel R2 | 0.7931 |
+| psth R2 | 0.2721 |
+
+Eval JSON: `lfads_outputs/lfads_output_mc_maze_20ms_val_nlb_eval.json`
+
+### 50-epoch baseline (first real single-seed baseline)
+
+| Field | Value |
+|-------|-------|
+| Run dir | `results/lfads_smoke/20260603T094126Z/` |
+| Data | `data/lfads/mc_maze_20ms_val.h5` (1721 train / 574 val trials) |
+| Train | 50 epochs, **batch size 32**, ~**15.7 min** wall time, CUDA |
+| Export | **20** posterior samples, ~**19.5 min**; finite `train/valid_output_params` |
+| Issues | No NaNs, no manifest warnings; **PSTH included** in evaluation |
+
+| Metric | Value |
+|--------|------:|
+| co-bps | **0.3499** |
+| fp-bps | 0.2402 |
+| vel R2 | 0.8967 |
+| psth R2 | 0.5843 |
+
+Artifacts:
+
+- Checkpoint: `lfads_run/lightning_checkpoints/49-2650.ckpt`
+- Rates: `lfads_outputs/lfads_output_mc_maze_20ms_val.h5`
+- Eval JSON: `lfads_outputs/lfads_output_mc_maze_20ms_val_nlb_eval.json`
+
+### Interpretation
+
+- This is a **valid first LFADS 20 ms validation baseline** on the bundled lfads-torch HDF5 split.
+- The LFADS track is **more than smoke plumbing**: export → NLB evaluate works on full data with PSTH.
+- **0.3499 co-bps (20 ms)** must not be read against **0.3830 (5 ms STNDT-lite)** without matching bin size and data contract.
+- Probe (2 epoch) → baseline (50 epoch) gained ~**+0.15 co-bps**, so loss was still improving; a longer run *may* help, but treat as hypothesis not a sweep mandate.
+- Further work should be **controlled single runs** (fixed seed, one knob at a time), not broad hyperparameter sweeps or uncontrolled overnight loops.
+
+### Recommended next experiments
+
+| Option | Recommendation |
+|--------|----------------|
+| **100 epochs, batch 32** | Reasonable next controlled run if checking whether 0.3499 is still climbing; export with `--num-samples 20` only after training finishes |
+| **batch 64 probe** | Useful if GPU memory allows (faster steps); one OOM retry to 32, no other knobs |
+| **8-hour / PBT run** | No |
+| **5 ms LFADS** | Later, only if fair comparison to STNDT-lite is required |
+| **Hyperparameter sweep** | Not yet |
+| **Public-test** | No |
+
+Stop after 100 epochs if co-bps barely moves vs 0.3499.
 
 ## Recommended path: 20 ms first, then decide on 5 ms
 
