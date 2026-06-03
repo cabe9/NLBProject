@@ -4,9 +4,10 @@
 
 This repo packages a small, reproducible Neural Latents Benchmark workflow for NLB'21 `mc_maze`. The core result is a validation-selected mixed STNDT-lite ensemble (4-layer `learning_rate=0.0013` 5-seed averaged with 5-layer `dropout=0.08` 5-seed) that reaches **`0.3830 co-bps`** on the local public-test target, scored through the official `nlb_tools` evaluation code. Scores are local reproducible public-test evaluations against the frozen NLB target HDF5, not live EvalAI ranks.
 
-Future coding agents should read [`AGENTS.md`](AGENTS.md) before changing
-models or benchmark configs; it records internal score gates, failed
-experiment paths, and public-test policy.
+Local agent notes are kept outside version control (not committed). They
+record internal score gates, failed experiment paths, and public-test
+policy for coding agents working in this tree before they change models or
+benchmark configs.
 
 ## Portfolio tracks (two branches)
 
@@ -123,7 +124,8 @@ Local evaluation against the public NLB test target HDF5:
 | **STNDT-lite, mixed lr0.0013/depth5 10-member ensemble** | **0.3830** | **0.9053** | **0.6390** |
 
 See [`docs/results.md`](docs/results.md) for the concise public-facing results
-table and [`AGENTS.md`](AGENTS.md) for internal experiment history.
+table; internal experiment history is kept in local agent notes outside
+version control.
 
 **Takeaways**
 
