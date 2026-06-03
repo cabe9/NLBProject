@@ -8,6 +8,17 @@ Future coding agents should read [`AGENTS.md`](AGENTS.md) before changing
 models or benchmark configs; it records internal score gates, failed
 experiment paths, and public-test policy.
 
+## Portfolio tracks (two branches)
+
+This repo is developed as **two parallel tracks** on separate branches (not merged yet):
+
+| Track | Branch | Bin size | Headline (local) |
+|-------|--------|----------|------------------|
+| **STNDT-lite** (this README’s main path) | `codex/pc-validated-screen-c-sanitized` | 5 ms | **0.3830 co-bps** public-test mixed ensemble |
+| **LFADS** (`lfads-torch`) | `lfads-baseline-setup` | 20 ms | **0.3606 co-bps** train/val (100-epoch single seed) |
+
+**Do not compare 5 ms and 20 ms scores directly.** Cross-track context, doc links, run IDs, and integration notes: [`docs/portfolio_overview.md`](docs/portfolio_overview.md). A future unified `portfolio-nlb-project` branch may merge both tracks; until then, keep branch-specific configs and results on their respective branches.
+
 ## Start here in 10 minutes
 
 If you're new to this repo, run this quick, safe path first:
