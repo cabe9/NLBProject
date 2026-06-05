@@ -43,6 +43,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-epochs", type=int, default=2)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--skip-train", action="store_true", help="Only verify imports and data")
+    parser.add_argument(
+        "--bin-size-ms",
+        type=int,
+        choices=(5, 20),
+        default=20,
+        help="Bin width label for defaults and manifest (default: 20)",
+    )
     return parser.parse_args(argv)
 
 
@@ -75,12 +82,12 @@ def _gpu_mem_mb() -> dict[str, float | None]:
         return {"cuda_available": False, "allocated_mb": None, "reserved_mb": None}
 
 
-def _resolve_data_h5(path: Path | None) -> Path:
+def _resolve_data_h5(path: Path | None, bin_size_ms: int = 20) -> Path:
     root = _repo_root()
     if path is not None:
         return path.expanduser().resolve()
-    smoke = root / "data" / "lfads" / "mc_maze_20ms_val_smoke.h5"
-    full = root / "data" / "lfads" / "mc_maze_20ms_val.h5"
+    smoke = root / "data" / "lfads" / f"mc_maze_{bin_size_ms}ms_val_smoke.h5"
+    full = root / "data" / "lfads" / f"mc_maze_{bin_size_ms}ms_val.h5"
     if smoke.is_file():
         return smoke
     if full.is_file():
@@ -106,9 +113,9 @@ def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
 
     sys.path.insert(0, str(_repo_root() / "scripts"))
-    from lfads_data_utils import assert_finite_h5, inspect_h5
+    from lfads_data_utils import assert_finite_h5, inspect_h5, lfads_training_overrides, model_dims_from_h5
 
-    data_h5 = _resolve_data_h5(args.data_h5)
+    data_h5 = _resolve_data_h5(args.data_h5, args.bin_size_ms)
     lfads_dir = _lfads_torch_dir(args.lfads_torch_dir)
     if not (lfads_dir / "lfads_torch").is_dir():
         raise FileNotFoundError(f"lfads-torch not found at {lfads_dir}")
@@ -128,11 +135,16 @@ def main(argv: list[str] | None = None) -> None:
     out_dir = (args.output_dir or (_repo_root() / "results" / "lfads_smoke" / stamp)).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    bin_ms = args.bin_size_ms
     manifest: dict = {
         "status": "started",
-        "bin_size_ms": 20,
-        "bin_size_label": "20 ms LFADS smoke — not comparable to 5 ms STNDT-lite headline",
+        "bin_size_ms": bin_ms,
+        "bin_size_label": (
+            f"{bin_ms} ms LFADS — label bin size on every score; "
+            "5 ms aligns with STNDT-lite, 20 ms is lfads-torch reference"
+        ),
         "data_h5": str(data_h5),
+        "model_dims": model_dims_from_h5(data_h5),
         "shapes": shapes,
         "lfads_torch_dir": str(lfads_dir),
         "gpu_before": _gpu_mem_mb(),
@@ -157,17 +169,16 @@ def main(argv: list[str] | None = None) -> None:
 
     from lfads_torch.run_model import run_model
 
-    data_pattern = str(data_h5.resolve()).replace("\\", "/")
     smoke_config_src = _repo_root() / "configs" / "lfads" / "smoke_single.yaml"
     smoke_config_dst = lfads_dir / "configs" / "smoke_single.yaml"
     shutil.copy2(smoke_config_src, smoke_config_dst)
 
-    overrides = {
-        "datamodule.datafile_pattern": data_pattern,
-        "trainer.max_epochs": args.max_epochs,
-        "datamodule.batch_size": args.batch_size,
-        "seed": 0,
-    }
+    overrides = lfads_training_overrides(
+        data_h5,
+        batch_size=args.batch_size,
+        max_epochs=args.max_epochs,
+        seed=0,
+    )
 
     logger.info("Training with cwd=%s for %s epochs", train_cwd, args.max_epochs)
     prev_cwd = Path.cwd()

@@ -65,6 +65,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--max-train-trials", type=int, default=8)
     parser.add_argument("--max-valid-trials", type=int, default=4)
+    parser.add_argument(
+        "--skip-psth",
+        action="store_true",
+        help="Skip PSTH/cond_idx (avoids large memory use at 5 ms); LFADS smoke uses behavior only",
+    )
     return parser.parse_args(argv)
 
 
@@ -95,6 +100,8 @@ def _prepare_from_nwb(
     out_path: Path,
     data_path: str | None,
     data_prefix: str,
+    *,
+    skip_psth: bool = False,
 ) -> dict:
     try:
         from nlb_tools.make_tensors import make_eval_target_tensors, make_train_input_tensors
@@ -137,7 +144,7 @@ def _prepare_from_nwb(
         train_trial_split="train",
         eval_trial_split="val",
         save_file=False,
-        include_psth=True,
+        include_psth=not skip_psth,
     )
     suf = "" if bin_size_ms == 5 else f"_{bin_size_ms}"
     bundle = targets[f"mc_maze{suf}"]
@@ -190,7 +197,13 @@ def main(argv: list[str] | None = None) -> None:
         meta = _prepare_from_reference(lfads_dir, 20, out_path)
         meta["bin_size_ms"] = 20
     else:
-        meta = _prepare_from_nwb(args.bin_size_ms, out_path, args.data_path, args.data_prefix)
+        meta = _prepare_from_nwb(
+            args.bin_size_ms,
+            out_path,
+            args.data_path,
+            args.data_prefix,
+            skip_psth=args.skip_psth,
+        )
 
     manifest_path = out_path.with_name(out_path.stem + "_manifest.json")
     write_manifest(manifest_path, meta)

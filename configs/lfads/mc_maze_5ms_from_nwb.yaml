@@ -9,10 +9,10 @@ bin_size_ms: 5
 bin_size_label: "5 ms — align with STNDT-lite pipeline; not comparable to 20 ms LFADS reference without relabeling"
 
 model:
-  encod_data_dim: null  # fill from manifest
-  encod_seq_len: null
-  recon_seq_len: null
-  readout_out_features: null
+  encod_data_dim: 137
+  encod_seq_len: 140
+  recon_seq_len: 180
+  readout_out_features: 182
   batch_size_smoke: 32
   batch_size_full: 32
 

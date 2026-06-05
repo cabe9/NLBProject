@@ -88,7 +88,7 @@ def export_rates(
 
     sys.path.insert(0, str(_repo_root() / "scripts"))
     sys.path.insert(0, str(lfads_dir))
-    from lfads_data_utils import inspect_h5
+    from lfads_data_utils import inspect_h5, lfads_training_overrides
 
     out_dir = run_dir / output_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -102,7 +102,6 @@ def export_rates(
     from lfads_torch.post_run.analysis import run_posterior_sampling
     from lfads_torch.run_model import flatten
 
-    data_pattern = str(data_h5).replace("\\", "/")
     smoke_config_src = _repo_root() / "configs" / "lfads" / "smoke_single.yaml"
     smoke_config_dst = lfads_dir / "configs" / "smoke_single.yaml"
     if smoke_config_src.is_file():
@@ -110,11 +109,12 @@ def export_rates(
 
         shutil.copy2(smoke_config_src, smoke_config_dst)
 
-    overrides = {
-        "datamodule.datafile_pattern": data_pattern,
-        "datamodule.batch_size": 4,
-        "seed": 0,
-    }
+    overrides = lfads_training_overrides(
+        data_h5,
+        batch_size=4,
+        max_epochs=1,
+        seed=0,
+    )
     override_list = [f"{k}={v}" for k, v in flatten(overrides).items()]
 
     prev_cwd = Path.cwd()
@@ -169,10 +169,14 @@ def export_rates(
                 arr = np.asarray(h5file[key][()], dtype=np.float64)
                 finite[key] = bool(np.isfinite(arr).all())
 
+    bin_ms = 20
+    root_manifest = run_dir / "manifest.json"
+    if root_manifest.is_file():
+        bin_ms = int(json.loads(root_manifest.read_text(encoding="utf-8")).get("bin_size_ms", 20))
     manifest = {
         "status": "exported",
-        "bin_size_ms": 20,
-        "bin_size_label": "20 ms — not comparable to 5 ms STNDT-lite headline",
+        "bin_size_ms": bin_ms,
+        "bin_size_label": f"{bin_ms} ms LFADS — label bin size on every score",
         "checkpoint": str(ckpt_path),
         "data_h5": str(data_h5),
         "lfads_output_h5": str(session_h5),
@@ -183,7 +187,6 @@ def export_rates(
     manifest_path = out_dir / "export_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
-    root_manifest = run_dir / "manifest.json"
     if root_manifest.is_file():
         root = json.loads(root_manifest.read_text(encoding="utf-8"))
         root["lfads_output_h5"] = str(session_h5)

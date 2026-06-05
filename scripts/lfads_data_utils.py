@@ -102,6 +102,49 @@ def subset_h5(
     return shapes
 
 
+def model_dims_from_h5(path: Path) -> dict[str, int]:
+    """Infer LFADS model/datamodule dimensions from an MC_Maze HDF5."""
+    with h5py.File(path, "r") as h5file:
+        encod = h5file["train_encod_data"]
+        recon = h5file["train_recon_data"]
+        return {
+            "encod_data_dim": int(encod.shape[-1]),
+            "encod_seq_len": int(encod.shape[1]),
+            "recon_seq_len": int(recon.shape[1]),
+            "readout_out_features": int(recon.shape[-1]),
+        }
+
+
+def lfads_h5_has_psth(path: Path) -> bool:
+    with h5py.File(path, "r") as h5file:
+        return "psth" in h5file
+
+
+def lfads_training_overrides(
+    data_h5: Path,
+    *,
+    batch_size: int,
+    max_epochs: int,
+    seed: int = 0,
+) -> dict[str, object]:
+    """Hydra override dict for smoke_single.yaml from a prepared HDF5."""
+    dims = model_dims_from_h5(data_h5)
+    pattern = str(data_h5.resolve()).replace("\\", "/")
+    overrides: dict[str, object] = {
+        "datamodule.datafile_pattern": pattern,
+        "datamodule.batch_size": batch_size,
+        "trainer.max_epochs": max_epochs,
+        "seed": seed,
+        "model.encod_data_dim": dims["encod_data_dim"],
+        "model.encod_seq_len": dims["encod_seq_len"],
+        "model.recon_seq_len": dims["recon_seq_len"],
+        "model.readout.modules.0.out_features": dims["readout_out_features"],
+    }
+    if not lfads_h5_has_psth(data_h5):
+        overrides["datamodule.attr_keys"] = []
+    return overrides
+
+
 def assert_finite_h5(path: Path, keys: tuple[str, ...] = LFADS_H5_KEYS) -> None:
     with h5py.File(path, "r") as h5file:
         for key in keys:
