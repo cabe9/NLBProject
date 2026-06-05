@@ -28,9 +28,9 @@ existing STNDT-lite stack. This is **not** another STNDT-lite screen.
 
 1. Optional **batch-size 64** probe if GPU memory allows (one OOM retry to 32; not a sweep).
 2. Optional **second seed** at 50–100 epochs if reproducibility matters.
-3. **5 ms** pipeline validated through probe + salvage; long-train unstable — see
-   [5 ms LFADS pipeline](#5-ms-lfads-pipeline-2026-06-04). Further 5 ms work needs explicit
-   stability knobs, not another unattended 50-epoch job.
+3. **5 ms** pipeline validated through probe + salvage; stability screen (2026-06-05) found a
+   bounded competitive config — see [5 ms LFADS stability screen](#5-ms-lfads-stability-screen-2026-06-05).
+   Best 5 ms train/val: **0.3160 co-bps** (S2, 20 posterior samples). Not public-test.
 4. **No 200-epoch** scaling without a new structural reason (diminishing returns vs 50→100).
 5. **No public-test** until explicit approval; never compare 20 ms scores to the 5 ms headline without bin-size labels.
 
@@ -318,7 +318,7 @@ Artifacts:
 | **200+ epochs** | No — diminishing returns after 100 vs 50 |
 | **batch 64 probe** | Next meaningful knob if GPU memory allows; one OOM retry to 32 |
 | **Second seed** | Optional reproducibility check at 50–100 epochs |
-| **5 ms LFADS** | Pipeline valid; long-train unstable — stability knobs only (see 5 ms section) |
+| **5 ms LFADS** | Stability screen complete — S2 **0.3160 co-bps** @ 30 epochs (see stability screen) |
 | **8-hour / PBT run** | No |
 | **Hyperparameter sweep** | Not yet |
 | **Public-test** | No |
@@ -376,35 +376,78 @@ Export via `scripts/export_lfads_rates.py --checkpoint …` (no new training):
 | Run dir (manifest / eval) | `results/lfads_smoke/20260604T062750Z/` |
 | Rates HDF5 | `lfads_outputs/lfads_output_mc_maze_5ms_val.h5` |
 | Outputs | **Finite** (`train/valid_output_params`) |
-| Export | 5 posterior samples (~20 min on full HDF5) |
+| Export (prior) | 5 posterior samples (~20 min on full HDF5) |
+| Export (final-quality, 2026-06-05) | **20** posterior samples (~78 min on full HDF5) |
 
-| Metric | Value |
-|--------|------:|
-| co-bps (val) | **0.2902** |
-| fp-bps | 0.1929 |
-| vel R2 | 0.8871 |
-| psth R2 | *not computed* (`--skip-psth` on 5 ms HDF5) |
+| Metric | 5 samples | 20 samples (baseline) |
+|--------|----------:|----------------------:|
+| co-bps (val) | **0.2902** | **0.2902** |
+| fp-bps | 0.1929 | 0.1928 |
+| vel R2 | 0.8871 | 0.8874 |
+| psth R2 | *not computed* | *not computed* |
 
-**vs 2-epoch probe:** salvage **0.2902** vs **0.1343** co-bps — materially better, but still
-**not** a stable full 50-epoch baseline (training diverged before epoch 18; no epoch 15–17
-checkpoints on disk).
+Eval JSON (20 samples): `lfads_outputs/lfads_output_mc_maze_5ms_val_nlb_eval.json`
 
-### Interpretation
+**vs 2-epoch probe:** salvage **0.2902** vs **0.1343** co-bps — materially better, but the
+original 50-epoch training run still diverged at ~epoch 18.
+
+## 5 ms LFADS stability screen (2026-06-05)
+
+Bounded screen after the failed 50-epoch jobs. Goal: beat salvage (**0.2902** @ 20 samples) by
+**+0.02 co-bps** (promotion threshold **~0.310**). **Not public-test.** **Not comparable** to
+STNDT-lite **0.3830 co-bps** without bin-size and model-family labels.
+
+### Screen configs
+
+| Config | batch | max_epochs | lr_init | grad_clip | seed | Run dir |
+|--------|------:|-----------:|--------:|----------:|-----:|---------|
+| Salvage (export only) | 8 | 14 (stopped) | 4e-3 (default) | 200 (default) | 0 | `20260604T062750Z` |
+| **S2** | 8 | 30 | **1e-3** | **1.0** | 0 | `20260605T060424Z` |
+| S3 | 8 | 40 | 5e-4 | 1.0 | 0 | *not run* |
+
+S3 was skipped: S2 beat the promotion threshold on 5-sample eval.
+
+### S2 result (stability config)
+
+| Field | Value |
+|-------|-------|
+| Run dir | `results/lfads_smoke/20260605T060424Z/` |
+| Data | `data/lfads/mc_maze_5ms_val.h5` |
+| Train wall time | ~**2.4 h** (30 epochs, batch 8, CUDA) |
+| Best checkpoint | `lfads_run/lightning_checkpoints/29-6450.ckpt` (epoch **29**) |
+| Training status | **Completed 30 epochs** — no IC-posterior NaN blow-up (unlike prior 50-epoch jobs) |
+| Manifest `status` | `diverged` (false positive: `valid/r2` is always NaN without PSTH; loss/recon_smth finite through epoch 30) |
+
+| Metric | 5 posterior samples | 20 posterior samples |
+|--------|--------------------:|---------------------:|
+| co-bps (val) | **0.3159** | **0.3160** |
+| fp-bps | 0.2120 | 0.2121 |
+| vel R2 | 0.8966 | 0.8971 |
+| psth R2 | *not computed* | *not computed* |
+| Outputs finite | yes | yes |
+
+Eval JSON (20 samples): `lfads_outputs/lfads_output_mc_maze_5ms_val_nlb_eval.json`
+
+**vs salvage (20 samples):** **+0.0258 co-bps** (0.2902 → 0.3160) — clears the +0.02 gate.
+
+### Interpretation (5 ms)
 
 - **5 ms LFADS data / export / NLB eval pipeline is valid** end-to-end.
-- **Current long-train LFADS recipe is unstable at 5 ms** — do **not** run another unattended
-  50-epoch job with this config.
-- Further 5 ms LFADS work should use **explicit stability changes**: lower `lr_init`,
-  gradient clipping, early stopping / capped epochs, or smaller model — not blind epoch scaling.
-- **20 ms LFADS** (**0.3606 co-bps**, 100 epochs) remains the **validated LFADS baseline** until
-  5 ms long-train stability is fixed.
+- **Default recipe (lr 4e-3, clip 200) is unstable at 5 ms** for long runs (divergence ~epoch 11–18).
+- **S2 stability knobs (lr 1e-3, clip 1.0, 30 epochs)** completed without numerical blow-up and
+  beat salvage by **+0.026 co-bps** — an honest bounded competitive attempt, not a full baseline.
+- **20 ms LFADS** (**0.3606 co-bps**, 100 epochs) remains the stronger validated LFADS baseline;
+  5 ms S2 (**0.3160**) is still **~0.045 co-bps** below 20 ms on train/val (different bin size).
+- **Do not** rerun the failed 50-epoch default recipe. Further 5 ms work (if approved) should
+  stay stability-first: early stopping on `valid/recon_smth`, optional S3/S4 probes, second seed —
+  not blind 50–100 epoch scaling or public-test.
 
 ## Recommended path
 
 **20 ms** — validated LFADS baseline (**0.3606 co-bps** train/val, 20 ms).
 
-**5 ms** — pipeline proven; fair STNDT-lite bin width, but long-train unstable. Use only with
-labeled **5 ms train/val LFADS** scores and stability-first follow-ups.
+**5 ms** — stability screen found **0.3160 co-bps** (S2, 30 epochs, lr 1e-3, clip 1.0). Fair
+STNDT-lite bin width for comparison context only; label every score. Not public-test.
 
 ## Policy
 
