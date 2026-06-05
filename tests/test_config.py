@@ -94,6 +94,8 @@ def test_select_on_full_val_flag_must_be_bool(tmp_path: Path) -> None:
     [
         "mc_maze_stndt_lite_identity_objective_5seed.yaml",
         "mc_maze_stndt_lite_cd_reconcile_screen.yaml",
+        "mc_maze_stndt_lite_screen_q_block_mask.yaml",
+        "mc_maze_stndt_lite_screen_r1_unit_calibration.yaml",
     ],
 )
 def test_benchmark_configs_load(config_name: str) -> None:
@@ -109,3 +111,9 @@ def test_benchmark_configs_load(config_name: str) -> None:
     if config_name.endswith("cd_reconcile_screen.yaml"):
         assert cfg.improvement.get("select_on_full_val_all_candidates") is True
         assert len(cfg.improvement["candidates"]) == 7
+    if config_name.endswith("screen_q_block_mask.yaml"):
+        assert cfg.improvement.get("select_on_full_val_all_candidates") is True
+        assert len(cfg.improvement["candidates"]) == 4
+    if config_name.endswith("screen_r1_unit_calibration.yaml"):
+        assert cfg.improvement.get("select_on_full_val_all_candidates") is True
+        assert len(cfg.improvement["candidates"]) == 4

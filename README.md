@@ -9,17 +9,23 @@ record internal score gates, failed experiment paths, and public-test
 policy for coding agents working in this tree before they change models or
 benchmark configs.
 
-## Portfolio tracks (two branches)
+## Portfolio tracks (unified branch)
 
-This repo is developed as **two parallel tracks** on separate branches (not merged yet):
+This repo hosts **two model-family tracks** on the unified `portfolio-nlb-project`
+branch. Label **bin size** and **split/type** on every score.
 
-| Track | Branch | Bin size | Headline (local) |
-|-------|--------|----------|------------------|
-| **STNDT-lite** (this README’s main path) | `codex/pc-validated-screen-c-sanitized` | 5 ms | **0.3830 co-bps** public-test mixed ensemble |
-| **LFADS** (`lfads-torch`) | `lfads-baseline-setup` | 20 ms | **0.3606 co-bps** train/val (100-epoch single seed) |
-| **LFADS** (`lfads-torch`) | `lfads-baseline-setup` | 5 ms | **~0.3157 co-bps** train/val (S2 stability config, seeds 0/1; mean of **0.3160** / **0.3154**) |
+| Track | Bin size | Split / type | Headline (local) |
+|-------|----------|--------------|------------------|
+| **STNDT-lite** mixed ensemble | 5 ms | local **public-test** | **0.3830 co-bps** |
+| **LFADS** (`lfads-torch`) | 20 ms | **train/val** | **0.3606 co-bps** (100-epoch single seed) |
+| **LFADS** S2 stability | 5 ms | **train/val** | **0.3160** / **0.3154** co-bps (seeds 0/1; mean **~0.3157**) |
 
-**Do not compare 5 ms and 20 ms scores directly.** The 5 ms LFADS result is **train/val only** (no public-test), uses the S2 stability recipe (30 epochs, lr **1e-3**, gradient clip **1.0**, batch 8), and remains **below** the 5 ms STNDT-lite public-test headline (**0.3830 co-bps**). Cross-track context, doc links, run IDs, and integration notes: [`docs/portfolio_overview.md`](docs/portfolio_overview.md). A future unified `portfolio-nlb-project` branch may merge both tracks; until then, keep branch-specific configs and results on their respective branches.
+**Do not compare 5 ms and 20 ms scores directly.** LFADS scores are **train/val
+only** — not equivalent to STNDT-lite **public-test** scores. The 5 ms LFADS S2
+result uses the stability recipe (30 epochs, lr **1e-3**, gradient clip **1.0**,
+batch 8) and remains **below** the 5 ms STNDT-lite public-test headline
+(**0.3830 co-bps**). Cross-track context, doc links, and run IDs:
+[`docs/portfolio_overview.md`](docs/portfolio_overview.md).
 
 ## Start here in 10 minutes
 
@@ -105,7 +111,7 @@ Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full 
 | lagged direct ridge (5 bins) | reference | 0.0215 | 0.1986 |
 | lagged reduced-rank regression (selected) | selected | 0.0283 | 0.2316 |
 | lagged PCA latent regression (5 bins) | reference | 0.0166 | 0.2400 |
-| **lagged PCA latent regression (selected history)** | **headline** | **0.0266** | **0.3648** |
+| **lagged PCA latent regression (selected history)** | **best linear baseline** | **0.0266** | **0.3648** |
 
 ![co-bps comparison](results/benchmark_runs/model_comparison.svg)
 

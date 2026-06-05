@@ -52,6 +52,124 @@ def _phase_masks(n_bins: int) -> dict[str, np.ndarray]:
     }
 
 
+def _speed_masks(behavior: np.ndarray) -> dict[str, np.ndarray]:
+    speed = np.linalg.norm(behavior, axis=-1)
+    return {
+        "low_speed": speed <= np.nanquantile(speed, 1 / 3),
+        "mid_speed": (speed > np.nanquantile(speed, 1 / 3))
+        & (speed <= np.nanquantile(speed, 2 / 3)),
+        "high_speed": speed > np.nanquantile(speed, 2 / 3),
+    }
+
+
+def _slice_masks(target: np.ndarray, behavior: np.ndarray) -> dict[str, np.ndarray]:
+    masks = dict(_phase_masks(target.shape[1]))
+    speed = _speed_masks(behavior)
+    for name, trial_mask in speed.items():
+        masks[name] = trial_mask[:, :, None]
+    return masks
+
+
+def _masked_values(array: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    if mask.ndim == 1:
+        return array[:, mask, :]
+    expanded = mask.repeat(array.shape[2], axis=2)
+    return array[expanded]
+
+
+def _absolute_slice_rows(
+    pred: np.ndarray,
+    target: np.ndarray,
+    behavior: np.ndarray,
+    *,
+    model_name: str,
+) -> list[dict[str, Any]]:
+    loss = _poisson_loss(pred, target)
+    total_loss = float(np.sum(loss))
+    total_spikes = float(np.sum(target))
+    rows: list[dict[str, Any]] = []
+    slice_masks = _slice_masks(target, behavior)
+
+    rows.append(
+        {
+            "model": model_name,
+            "slice": "overall",
+            "mean_loss": float(np.mean(loss)),
+            "total_loss": total_loss,
+            "loss_share": 1.0,
+            "spike_share": 1.0,
+            "disproportion": 1.0,
+            "mean_bias": float(np.mean(pred - target)),
+            "mean_pred": float(np.mean(pred)),
+            "mean_target": float(np.mean(target)),
+            "target_spikes": total_spikes,
+        }
+    )
+
+    for slice_name, mask in slice_masks.items():
+        masked_loss = _masked_values(loss, mask)
+        masked_target = _masked_values(target, mask)
+        masked_pred = _masked_values(pred, mask)
+        slice_total_loss = float(np.sum(masked_loss))
+        slice_spikes = float(np.sum(masked_target))
+        loss_share = slice_total_loss / total_loss if total_loss > 0 else 0.0
+        spike_share = slice_spikes / total_spikes if total_spikes > 0 else 0.0
+        disproportion = loss_share / spike_share if spike_share > 0 else 0.0
+        rows.append(
+            {
+                "model": model_name,
+                "slice": slice_name,
+                "mean_loss": float(np.mean(masked_loss)),
+                "total_loss": slice_total_loss,
+                "loss_share": loss_share,
+                "spike_share": spike_share,
+                "disproportion": disproportion,
+                "mean_bias": float(np.mean(masked_pred - masked_target)),
+                "mean_pred": float(np.mean(masked_pred)),
+                "mean_target": float(np.mean(masked_target)),
+                "target_spikes": slice_spikes,
+            }
+        )
+    return rows
+
+
+def _absolute_unit_rows(
+    pred: np.ndarray,
+    target: np.ndarray,
+    *,
+    model_name: str,
+) -> list[dict[str, Any]]:
+    loss = _poisson_loss(pred, target)
+    total_loss = float(np.sum(loss))
+    total_spikes = float(np.sum(target))
+    rows: list[dict[str, Any]] = []
+    for unit_idx in range(target.shape[2]):
+        unit_loss = loss[:, :, unit_idx]
+        unit_target = target[:, :, unit_idx]
+        unit_pred = pred[:, :, unit_idx]
+        unit_total_loss = float(np.sum(unit_loss))
+        unit_spikes = float(np.sum(unit_target))
+        loss_share = unit_total_loss / total_loss if total_loss > 0 else 0.0
+        spike_share = unit_spikes / total_spikes if total_spikes > 0 else 0.0
+        disproportion = loss_share / spike_share if spike_share > 0 else 0.0
+        rows.append(
+            {
+                "model": model_name,
+                "unit": unit_idx,
+                "mean_loss": float(np.mean(unit_loss)),
+                "total_loss": unit_total_loss,
+                "loss_share": loss_share,
+                "spike_share": spike_share,
+                "disproportion": disproportion,
+                "mean_bias": float(np.mean(unit_pred - unit_target)),
+                "mean_pred": float(np.mean(unit_pred)),
+                "mean_target": float(np.mean(unit_target)),
+                "target_spikes": unit_spikes,
+            }
+        )
+    return rows
+
+
 def _load_target(
     dataset_name: str,
     data_path: str | None,
@@ -186,6 +304,153 @@ def _condition_rows(
     return rows
 
 
+def _markdown_table(frame: pd.DataFrame, *, max_rows: int | None = None) -> str:
+    shown = frame if max_rows is None else frame.head(max_rows)
+    columns = list(shown.columns)
+    lines = [
+        "| " + " | ".join(columns) + " |",
+        "| " + " | ".join("---" for _ in columns) + " |",
+    ]
+    for row in shown.itertuples(index=False, name=None):
+        cells = []
+        for value in row:
+            if isinstance(value, float):
+                cells.append(f"{value:.6f}")
+            else:
+                cells.append(str(value))
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def _evaluate_screen_r_gate(
+    slice_summary: pd.DataFrame,
+    unit_summary: pd.DataFrame,
+) -> dict[str, Any]:
+    """Return go/no-go metadata for a minimal Screen R (loss reweighting) follow-up."""
+    non_overall = slice_summary[slice_summary["slice"] != "overall"].copy()
+    non_overall = non_overall.sort_values("disproportion", ascending=False)
+    top_slices = non_overall.head(3)
+    flagged_slices = non_overall[
+        (non_overall["disproportion"] >= 1.10) & (non_overall["spike_share"] >= 0.08)
+    ]
+
+    units = unit_summary.sort_values("total_loss", ascending=False)
+    top5_loss_share = float(units.head(5)["loss_share"].sum())
+    top5_spike_share = float(units.head(5)["spike_share"].sum())
+    high_rate_units = units[units["target_spikes"] >= units["target_spikes"].quantile(0.75)]
+    high_rate_disproportion = float(high_rate_units["disproportion"].mean())
+
+    slice_signal = len(flagged_slices) >= 1 and float(flagged_slices["disproportion"].max()) >= 1.10
+    unit_signal = top5_loss_share >= 0.18 and top5_loss_share / max(top5_spike_share, 1e-6) >= 1.15
+    go = bool(slice_signal and unit_signal)
+
+    return {
+        "go": go,
+        "slice_signal": slice_signal,
+        "unit_signal": unit_signal,
+        "top_slices": top_slices.to_dict(orient="records"),
+        "flagged_slices": flagged_slices.to_dict(orient="records"),
+        "top5_loss_share": top5_loss_share,
+        "top5_spike_share": top5_spike_share,
+        "high_rate_unit_mean_disproportion": high_rate_disproportion,
+        "worst_units": units.head(8)[
+            ["unit", "mean_loss", "loss_share", "spike_share", "disproportion", "mean_bias"]
+        ].to_dict(orient="records"),
+    }
+
+
+def _write_absolute_summary(
+    out_dir: Path,
+    slice_summary: pd.DataFrame,
+    unit_summary: pd.DataFrame,
+    model_name: str,
+) -> None:
+    gate = _evaluate_screen_r_gate(slice_summary, unit_summary)
+    slices = slice_summary[slice_summary["slice"] != "overall"].sort_values(
+        "disproportion", ascending=False
+    )
+    units = unit_summary.sort_values("total_loss", ascending=False)
+
+    verdict = "GO" if gate["go"] else "NO-GO"
+    lines = [
+        "# Headline Validation Residual Diagnostic (Absolute)",
+        "",
+        f"Model: `{model_name}`.",
+        "Absolute Poisson residual analysis on train/val held-out spikes.",
+        "`disproportion` = (loss share) / (spike share); values > 1 mean harder than average.",
+        "`mean_bias` > 0 means over-prediction on average.",
+        "",
+        f"## Screen R gate: **{verdict}**",
+        "",
+        f"- Slice signal (any slice disproportion >= 1.10 with >= 8% spikes): "
+        f"{'yes' if gate['slice_signal'] else 'no'}",
+        f"- Unit signal (top-5 units >= 18% loss share and >= 1.15x spike share): "
+        f"{'yes' if gate['unit_signal'] else 'no'}",
+        f"- Top-5 unit loss share: {gate['top5_loss_share']:.3f}; spike share: "
+        f"{gate['top5_spike_share']:.3f}",
+        "",
+        "Proceed to a minimal Screen R (phase/unit loss reweighting) only if **GO**.",
+        "",
+        "## Phase and Speed Slices",
+        "",
+        _markdown_table(slices),
+        "",
+        "## Highest-Loss Units",
+        "",
+        _markdown_table(
+            units.head(12)[
+                [
+                    "unit",
+                    "mean_loss",
+                    "total_loss",
+                    "loss_share",
+                    "spike_share",
+                    "disproportion",
+                    "mean_bias",
+                    "target_spikes",
+                ]
+            ]
+        ),
+        "",
+        "## Lowest-Loss Units",
+        "",
+        _markdown_table(
+            units.tail(5)[
+                [
+                    "unit",
+                    "mean_loss",
+                    "loss_share",
+                    "spike_share",
+                    "disproportion",
+                    "mean_bias",
+                    "target_spikes",
+                ]
+            ]
+        ),
+        "",
+    ]
+    (out_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
+    (out_dir / "go_no_go.json").write_text(json.dumps(gate, indent=2), encoding="utf-8")
+    (out_dir / "go_no_go.md").write_text(
+        "\n".join(
+            [
+                f"# Screen R Go/No-Go: {verdict}",
+                "",
+                "Gate requires both:",
+                "- At least one phase/speed slice with disproportion >= 1.10 and >= 8% of spikes.",
+                "- Top-5 units carry >= 18% of total loss while being disproportionately hard.",
+                "",
+                f"Slice signal: {'pass' if gate['slice_signal'] else 'fail'}",
+                f"Unit signal: {'pass' if gate['unit_signal'] else 'fail'}",
+                "",
+                "If NO-GO: do not spend compute on Screen R; document stop.",
+                "If GO: design Screen R as the smallest targeted loss reweighting intervention.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_summary(
     out_dir: Path,
     model_summary: pd.DataFrame,
@@ -256,6 +521,12 @@ def _write_summary(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Diagnose validation residual patterns.")
+    parser.add_argument(
+        "--mode",
+        choices=("compare", "absolute"),
+        default="compare",
+        help="compare: multiple models vs first reference; absolute: single-model analysis.",
+    )
     parser.add_argument("--output-dir", default="results/diagnostics/validation_residuals")
     parser.add_argument("--dataset-name", default="mc_maze")
     parser.add_argument("--data-path", default=None)
@@ -267,7 +538,7 @@ def parse_args() -> argparse.Namespace:
         nargs=2,
         metavar=("NAME", "PATH"),
         required=True,
-        help="Prediction label and HDF5 path. First prediction is the reference.",
+        help="Prediction label and HDF5 path. First prediction is the reference in compare mode.",
     )
     return parser.parse_args()
 
@@ -281,15 +552,41 @@ def main() -> None:
         args.data_prefix,
         args.bin_size_ms,
     )
-    prediction_sets = [
-        PredictionSet(name=name, path=Path(path)) for name, path in args.prediction
-    ]
+    prediction_sets = [PredictionSet(name=name, path=Path(path)) for name, path in args.prediction]
     predictions = {
         item.name: _read_heldout_rates(item.path, args.dataset_name) for item in prediction_sets
     }
     for name, pred in predictions.items():
         if pred.shape != target.shape:
             raise ValueError(f"{name}: prediction shape {pred.shape} != target {target.shape}")
+
+    if args.mode == "absolute":
+        if len(prediction_sets) != 1:
+            raise ValueError("absolute mode requires exactly one --prediction NAME PATH")
+        model_name = prediction_sets[0].name
+        pred = predictions[model_name]
+        slice_summary = pd.DataFrame(
+            _absolute_slice_rows(pred, target, behavior, model_name=model_name)
+        )
+        unit_summary = pd.DataFrame(_absolute_unit_rows(pred, target, model_name=model_name))
+        slice_summary.to_csv(out_dir / "slice_summary.csv", index=False)
+        unit_summary.to_csv(out_dir / "unit_summary.csv", index=False)
+        (out_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "mode": "absolute",
+                    "dataset_name": args.dataset_name,
+                    "bin_size_ms": args.bin_size_ms,
+                    "model": model_name,
+                    "prediction": str(prediction_sets[0].path),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        _write_absolute_summary(out_dir, slice_summary, unit_summary, model_name)
+        print(f"Wrote absolute residual diagnostic -> {out_dir}")
+        return
 
     model_summary = pd.DataFrame(_model_summary_rows(predictions, target, behavior))
     unit_summary = pd.DataFrame(_unit_rows(predictions, target))

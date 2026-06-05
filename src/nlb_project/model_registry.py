@@ -324,6 +324,11 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             SweepAxis("neuron_readout_scale_grid", "neuron_readout_scale", float),
             SweepAxis("use_mask_token_grid", "use_mask_token", bool),
             SweepAxis("warmup_epochs_grid", "warmup_epochs", int),
+            SweepAxis("mask_mode_grid", "mask_mode", str),
+            SweepAxis("span_length_grid", "span_length", int),
+            SweepAxis("unit_calibration_grid", "unit_calibration", bool),
+            SweepAxis("unit_calibration_scale_reg_grid", "unit_calibration_scale_reg", float),
+            SweepAxis("unit_calibration_bias_reg_grid", "unit_calibration_bias_reg", float),
         ),
         improvement_overrides=(
             ("n_heads", int),
