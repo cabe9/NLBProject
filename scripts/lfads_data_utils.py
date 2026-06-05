@@ -126,6 +126,8 @@ def lfads_training_overrides(
     batch_size: int,
     max_epochs: int,
     seed: int = 0,
+    lr_init: float | None = None,
+    gradient_clip_val: float | None = None,
 ) -> dict[str, object]:
     """Hydra override dict for smoke_single.yaml from a prepared HDF5."""
     dims = model_dims_from_h5(data_h5)
@@ -140,9 +142,91 @@ def lfads_training_overrides(
         "model.recon_seq_len": dims["recon_seq_len"],
         "model.readout.modules.0.out_features": dims["readout_out_features"],
     }
+    if lr_init is not None:
+        overrides["model.lr_init"] = lr_init
+    if gradient_clip_val is not None:
+        overrides["trainer.gradient_clip_val"] = gradient_clip_val
     if not lfads_h5_has_psth(data_h5):
         overrides["datamodule.attr_keys"] = []
     return overrides
+
+
+def best_checkpoint_in_dir(ckpt_dir: Path) -> Path | None:
+    """Return the best (non-last) checkpoint saved by ModelCheckpoint, if any."""
+    if not ckpt_dir.is_dir():
+        return None
+    candidates = sorted(ckpt_dir.glob("*.ckpt"), key=lambda p: p.stat().st_mtime)
+    non_last = [p for p in candidates if p.name != "last.ckpt"]
+    return non_last[-1] if non_last else None
+
+
+def analyze_lfads_metrics_csv(path: Path) -> dict[str, Any]:
+    """Summarize LFADS csv_logs metrics for divergence and best valid/recon_smth."""
+    import csv
+
+    if not path.is_file():
+        return {"metrics_csv": str(path), "available": False}
+
+    rows: list[dict[str, str]] = []
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            rows.append(row)
+
+    def _float(value: str | None) -> float | None:
+        if value is None or value == "":
+            return None
+        try:
+            parsed = float(value)
+        except ValueError:
+            return None
+        if not np.isfinite(parsed):
+            return None
+        return parsed
+
+    best_smth: float | None = None
+    best_epoch: int | None = None
+    last_finite_epoch: int | None = None
+    first_nan_epoch: int | None = None
+    nan_columns: list[str] = []
+
+    for row in rows:
+        epoch_raw = row.get("epoch")
+        if epoch_raw in (None, ""):
+            continue
+        epoch = int(float(epoch_raw))
+        smth = _float(row.get("valid/recon_smth"))
+        loss = _float(row.get("valid/loss"))
+        finite_row = smth is not None or loss is not None
+        if finite_row:
+            last_finite_epoch = epoch
+            if smth is not None and (best_smth is None or smth < best_smth):
+                best_smth = smth
+                best_epoch = epoch
+        else:
+            if first_nan_epoch is None:
+                first_nan_epoch = epoch
+                for key in ("valid/recon_smth", "valid/loss", "valid/recon"):
+                    val = row.get(key)
+                    if val not in (None, ""):
+                        try:
+                            if not np.isfinite(float(val)):
+                                nan_columns.append(key)
+                        except ValueError:
+                            nan_columns.append(key)
+
+    diverged = first_nan_epoch is not None
+    return {
+        "metrics_csv": str(path),
+        "available": True,
+        "best_valid_recon_smth": best_smth,
+        "best_epoch": best_epoch,
+        "last_finite_epoch": last_finite_epoch,
+        "first_nan_epoch": first_nan_epoch,
+        "diverged": diverged,
+        "nan_columns": sorted(set(nan_columns)),
+        "completed_epochs": last_finite_epoch,
+    }
 
 
 def assert_finite_h5(path: Path, keys: tuple[str, ...] = LFADS_H5_KEYS) -> None:

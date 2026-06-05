@@ -42,6 +42,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--max-epochs", type=int, default=2)
     parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--lr-init",
+        type=float,
+        default=None,
+        help="Override model.lr_init (default: smoke_single.yaml / nlb_mc_maze)",
+    )
+    parser.add_argument(
+        "--gradient-clip-val",
+        type=float,
+        default=None,
+        help="Override trainer.gradient_clip_val (default: smoke_single.yaml)",
+    )
     parser.add_argument("--skip-train", action="store_true", help="Only verify imports and data")
     parser.add_argument(
         "--bin-size-ms",
@@ -113,7 +126,14 @@ def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
 
     sys.path.insert(0, str(_repo_root() / "scripts"))
-    from lfads_data_utils import assert_finite_h5, inspect_h5, lfads_training_overrides, model_dims_from_h5
+    from lfads_data_utils import (
+        analyze_lfads_metrics_csv,
+        assert_finite_h5,
+        best_checkpoint_in_dir,
+        inspect_h5,
+        lfads_training_overrides,
+        model_dims_from_h5,
+    )
 
     data_h5 = _resolve_data_h5(args.data_h5, args.bin_size_ms)
     lfads_dir = _lfads_torch_dir(args.lfads_torch_dir)
@@ -136,6 +156,13 @@ def main(argv: list[str] | None = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     bin_ms = args.bin_size_ms
+    training_config = {
+        "batch_size": args.batch_size,
+        "max_epochs": args.max_epochs,
+        "seed": args.seed,
+        "lr_init": args.lr_init,
+        "gradient_clip_val": args.gradient_clip_val,
+    }
     manifest: dict = {
         "status": "started",
         "bin_size_ms": bin_ms,
@@ -145,6 +172,7 @@ def main(argv: list[str] | None = None) -> None:
         ),
         "data_h5": str(data_h5),
         "model_dims": model_dims_from_h5(data_h5),
+        "training_config": training_config,
         "shapes": shapes,
         "lfads_torch_dir": str(lfads_dir),
         "gpu_before": _gpu_mem_mb(),
@@ -177,7 +205,9 @@ def main(argv: list[str] | None = None) -> None:
         data_h5,
         batch_size=args.batch_size,
         max_epochs=args.max_epochs,
-        seed=0,
+        seed=args.seed,
+        lr_init=args.lr_init,
+        gradient_clip_val=args.gradient_clip_val,
     )
 
     logger.info("Training with cwd=%s for %s epochs", train_cwd, args.max_epochs)
@@ -218,25 +248,43 @@ def main(argv: list[str] | None = None) -> None:
                     nan_report[f"{out_h5.name}:{key}"] = bool(np.isfinite(arr).all())
                     output_shapes[f"{out_h5.name}:{key}"] = list(arr.shape)
 
-    metrics_path = train_cwd / "csv_logs" / "version_0" / "metrics.csv"
-    if metrics_path.is_file():
-        shutil.copy2(metrics_path, run_subdir / "metrics.csv")
+    metrics_src = train_cwd / "csv_logs" / "metrics.csv"
+    if not metrics_src.is_file():
+        metrics_src = train_cwd / "csv_logs" / "version_0" / "metrics.csv"
+    metrics_dest = run_subdir / "metrics.csv"
+    if metrics_src.is_file():
+        shutil.copy2(metrics_src, metrics_dest)
 
-    ckpt_saved = (run_subdir / "lightning_checkpoints").is_dir()
+    ckpt_dir_saved = run_subdir / "lightning_checkpoints"
+    best_ckpt = best_checkpoint_in_dir(ckpt_dir_saved)
+    metrics_summary = analyze_lfads_metrics_csv(metrics_dest)
+    ckpt_saved = ckpt_dir_saved.is_dir()
+    status = "completed"
+    if metrics_summary.get("diverged"):
+        status = "diverged"
+    elif not ckpt_saved and not output_files:
+        status = "completed_with_warnings"
+
     manifest.update(
         {
-            "status": "completed",
+            "status": status,
             "output_files": [str(p) for p in output_files],
             "output_shapes": output_shapes,
             "finite_outputs": nan_report,
             "checkpoint_saved": ckpt_saved,
+            "best_checkpoint": str(best_ckpt) if best_ckpt is not None else None,
+            "metrics_summary": metrics_summary,
             "gpu_after": _gpu_mem_mb(),
         }
     )
-    if not ckpt_saved and not output_files:
-        manifest["status"] = "completed_with_warnings"
+    if status == "completed_with_warnings":
         manifest["warning"] = (
             "No checkpoints or lfads_output HDF5; try smaller --batch-size or more smoke trials."
+        )
+    if status == "diverged":
+        manifest["warning"] = (
+            f"Training diverged at epoch {metrics_summary.get('first_nan_epoch')}; "
+            f"last finite epoch {metrics_summary.get('last_finite_epoch')}."
         )
     manifest_path = out_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
