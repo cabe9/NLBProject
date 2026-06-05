@@ -102,13 +102,15 @@ Findings (validation split, headline ensemble):
 
 ## Expansion: LFADS / AutoLFADS baseline (separate track)
 
-A parallel branch (`lfads-baseline-setup`, pushed separately) adds an **LFADS
-(`lfads-torch`) smoke train, rate export, and NLB evaluation bridge** — a different
+A companion **LFADS (`lfads-torch`)** track on the unified
+[`portfolio-nlb-project`](https://github.com/cabe9/NLBProject/tree/portfolio-nlb-project)
+branch adds smoke train, rate export, and NLB evaluation bridge — a different
 model family, not another STNDT-lite screen.
 
 - LFADS upstream MC_Maze tooling targets **20 ms** binning; the STNDT-lite headline is **5 ms**.
 - **Do not compare 20 ms and 5 ms co-bps without explicit bin-size labels.**
-- LFADS paths (`external/lfads-torch/`, `results/lfads_smoke/`, local envs) are gitignored on the STNDT branch; smoke artifacts stay local.
+- LFADS paths (`external/lfads-torch/`, `results/lfads_smoke/`, local envs) are gitignored locally; smoke artifacts stay local.
+- Details: [`docs/lfads_baseline_plan.md`](lfads_baseline_plan.md), [`docs/portfolio_overview.md`](portfolio_overview.md).
 
 ## Conclusion
 

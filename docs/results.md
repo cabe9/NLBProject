@@ -35,10 +35,12 @@ The frozen `MC_Maze 5 ms` rank-1 leaderboard reference is `0.3862 co-bps`
 local benchmark improvement, but it should not be described as a live
 leaderboard rank.
 
-## LFADS baselines (separate track, `lfads-baseline-setup` branch)
+## LFADS baselines (separate model-family track)
 
 LFADS scores are **train/val only** via `nlb_tools.evaluate` — **not public-test**.
-Label bin size on every score.
+Label bin size on every score. Both STNDT-lite and LFADS tracks live on the unified
+[`portfolio-nlb-project`](https://github.com/cabe9/NLBProject/tree/portfolio-nlb-project)
+branch; see [`docs/lfads_baseline_plan.md`](lfads_baseline_plan.md).
 
 | Model | Bin size | Split | co-bps | Notes |
 |---|---|---|---:|---|

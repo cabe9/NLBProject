@@ -102,7 +102,7 @@ What success looks like:
 
 ## Linear results at a glance
 
-Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full table: [`results/benchmark_runs/model_comparison.md`](results/benchmark_runs/model_comparison.md). Source `metrics.csv` files: [`results/benchmark_runs/`](results/benchmark_runs/). Notebook walkthrough: [nbviewer render](https://nbviewer.org/github/cabe9/NLBProject/blob/master/notebooks/results_walkthrough.ipynb) ([source notebook](notebooks/results_walkthrough.ipynb)).
+Scored under the `log_link` rate readout on the `mc_maze` train/val split. Full table: [`results/benchmark_runs/model_comparison.md`](results/benchmark_runs/model_comparison.md). Source `metrics.csv` files: [`results/benchmark_runs/`](results/benchmark_runs/). Notebook walkthrough: [nbviewer render](https://nbviewer.org/github/cabe9/NLBProject/blob/portfolio-nlb-project/notebooks/results_walkthrough.ipynb) ([source notebook](notebooks/results_walkthrough.ipynb)).
 
 | Model | Role | co-bps | vel R² |
 |---|---|---:|---:|
@@ -162,7 +162,7 @@ The runner resolves the NWB path from either `data_path` in the config, or from 
 
 ## Start here, not in source
 
-- **[Results walkthrough notebook](https://nbviewer.org/github/cabe9/NLBProject/blob/master/notebooks/results_walkthrough.ipynb)** — rendered walkthrough of the comparison table and plots (90-second skim); source: [`notebooks/results_walkthrough.ipynb`](notebooks/results_walkthrough.ipynb).
+- **[Results walkthrough notebook](https://nbviewer.org/github/cabe9/NLBProject/blob/portfolio-nlb-project/notebooks/results_walkthrough.ipynb)** — rendered walkthrough of the comparison table and plots (90-second skim); source: [`notebooks/results_walkthrough.ipynb`](notebooks/results_walkthrough.ipynb).
 - **[`docs/results.md`](docs/results.md)** — concise public-facing results table and benchmark caveats.
 - **[`docs/architecture.md`](docs/architecture.md)** — pipeline diagram and stage-by-stage control flow.
 - **[`docs/models.md`](docs/models.md)** — one-paragraph description of each model family.
