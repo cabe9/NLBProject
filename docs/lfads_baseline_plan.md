@@ -27,7 +27,8 @@ existing STNDT-lite stack. This is **not** another STNDT-lite screen.
 ### Next (controlled runs only)
 
 1. Optional **batch-size 64** probe if GPU memory allows (one OOM retry to 32; not a sweep).
-2. Optional **second seed** at 50–100 epochs if reproducibility matters.
+2. **5 ms S2 second-seed reproducibility** complete — seed 1 matches seed 0 within **0.001 co-bps**
+   (see [Second-seed S2 check](#second-seed-s2-reproducibility-check-2026-06-05)).
 3. **5 ms** pipeline validated through probe + salvage; stability screen (2026-06-05) found a
    bounded competitive config — see [5 ms LFADS stability screen](#5-ms-lfads-stability-screen-2026-06-05).
    Best 5 ms train/val: **0.3160 co-bps** (S2, 20 posterior samples). Not public-test.
@@ -403,11 +404,12 @@ STNDT-lite **0.3830 co-bps** without bin-size and model-family labels.
 |--------|------:|-----------:|--------:|----------:|-----:|---------|
 | Salvage (export only) | 8 | 14 (stopped) | 4e-3 (default) | 200 (default) | 0 | `20260604T062750Z` |
 | **S2** | 8 | 30 | **1e-3** | **1.0** | 0 | `20260605T060424Z` |
+| **S2** | 8 | 30 | **1e-3** | **1.0** | 1 | `20260605T171044Z` |
 | S3 | 8 | 40 | 5e-4 | 1.0 | 0 | *not run* |
 
 S3 was skipped: S2 beat the promotion threshold on 5-sample eval.
 
-### S2 result (stability config)
+### S2 result — seed 0
 
 | Field | Value |
 |-------|-------|
@@ -416,7 +418,6 @@ S3 was skipped: S2 beat the promotion threshold on 5-sample eval.
 | Train wall time | ~**2.4 h** (30 epochs, batch 8, CUDA) |
 | Best checkpoint | `lfads_run/lightning_checkpoints/29-6450.ckpt` (epoch **29**) |
 | Training status | **Completed 30 epochs** — no IC-posterior NaN blow-up (unlike prior 50-epoch jobs) |
-| Manifest `status` | **Completed 30 epochs** — no IC-posterior NaN blow-up (unlike prior 50-epoch jobs) |
 
 | Metric | 5 posterior samples | 20 posterior samples |
 |--------|--------------------:|---------------------:|
@@ -430,6 +431,42 @@ Eval JSON (20 samples): `lfads_outputs/lfads_output_mc_maze_5ms_val_nlb_eval.jso
 
 **vs salvage (20 samples):** **+0.0258 co-bps** (0.2902 → 0.3160) — clears the +0.02 gate.
 
+### Second-seed S2 reproducibility check (2026-06-05)
+
+Same S2 config as seed 0; only `--seed 1` changed. **Not public-test.**
+
+| Field | Value |
+|-------|-------|
+| Run dir | `results/lfads_smoke/20260605T171044Z/` |
+| Config | batch 8, 30 epochs, lr **1e-3**, grad clip **1.0**, seed **1** |
+| Train wall time | ~**2.4 h** (30 epochs, batch 8, CUDA) |
+| Best checkpoint | `lfads_run/lightning_checkpoints/29-6450-v1.ckpt` (epoch **29**) |
+| Training status | **Completed 30 epochs** — `diverged: false`, finite core metrics through epoch 29 |
+
+| Metric | 5 posterior samples | 20 posterior samples |
+|--------|--------------------:|---------------------:|
+| co-bps (val) | **0.3153** | **0.3154** |
+| fp-bps | 0.2155 | 0.2156 |
+| vel R2 | 0.8956 | 0.8958 |
+| psth R2 | *not computed* | *not computed* |
+| Outputs finite | yes | yes |
+
+Eval JSON (20 samples): `lfads_outputs/lfads_output_mc_maze_5ms_val_nlb_eval.json`
+
+20-sample export was run (5-sample **0.3153** ≥ **0.296** gate and within **0.001** of seed 0).
+
+**vs seed 0 (20 samples):**
+
+| Metric | seed 0 | seed 1 | Δ (1 − 0) |
+|--------|-------:|-------:|----------:|
+| co-bps | 0.3160 | 0.3154 | **−0.0006** |
+| fp-bps | 0.2121 | 0.2156 | +0.0035 |
+| vel R2 | 0.8971 | 0.8958 | −0.0013 |
+
+**Reproducibility:** training completed stably on both seeds; 20-sample co-bps differs by only
+**0.0006** — well inside the **~0.02** tolerance. S2 is a **reproducible 5 ms LFADS train/val
+config** (two seeds, not an ensemble). Mean 20-sample co-bps ≈ **0.3157**.
+
 ### Interpretation (5 ms)
 
 - **5 ms LFADS data / export / NLB eval pipeline is valid** end-to-end.
@@ -439,15 +476,16 @@ Eval JSON (20 samples): `lfads_outputs/lfads_output_mc_maze_5ms_val_nlb_eval.jso
 - **20 ms LFADS** (**0.3606 co-bps**, 100 epochs) remains the stronger validated LFADS baseline;
   5 ms S2 (**0.3160**) is still **~0.045 co-bps** below 20 ms on train/val (different bin size).
 - **Do not** rerun the failed 50-epoch default recipe. Further 5 ms work (if approved) should
-  stay stability-first: early stopping on `valid/recon_smth`, optional S3/S4 probes, second seed —
-  not blind 50–100 epoch scaling or public-test.
+  stay stability-first: early stopping on `valid/recon_smth`, optional S3/S4 probes — not blind
+  50–100 epoch scaling, multi-seed ensembles, or public-test without explicit approval.
 
 ## Recommended path
 
 **20 ms** — validated LFADS baseline (**0.3606 co-bps** train/val, 20 ms).
 
-**5 ms** — stability screen found **0.3160 co-bps** (S2, 30 epochs, lr 1e-3, clip 1.0). Fair
-STNDT-lite bin width for comparison context only; label every score. Not public-test.
+**5 ms** — S2 stability config reproducible across seeds 0/1 (**0.3160** / **0.3154** co-bps @
+20 samples; mean ≈ **0.3157**). Fair STNDT-lite bin width for comparison context only; label every
+score. Not public-test.
 
 ## Policy
 
