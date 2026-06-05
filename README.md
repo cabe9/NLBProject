@@ -17,8 +17,9 @@ This repo is developed as **two parallel tracks** on separate branches (not merg
 |-------|--------|----------|------------------|
 | **STNDT-lite** (this README’s main path) | `codex/pc-validated-screen-c-sanitized` | 5 ms | **0.3830 co-bps** public-test mixed ensemble |
 | **LFADS** (`lfads-torch`) | `lfads-baseline-setup` | 20 ms | **0.3606 co-bps** train/val (100-epoch single seed) |
+| **LFADS** (`lfads-torch`) | `lfads-baseline-setup` | 5 ms | **~0.3157 co-bps** train/val (S2 stability config, seeds 0/1; mean of **0.3160** / **0.3154**) |
 
-**Do not compare 5 ms and 20 ms scores directly.** Cross-track context, doc links, run IDs, and integration notes: [`docs/portfolio_overview.md`](docs/portfolio_overview.md). A future unified `portfolio-nlb-project` branch may merge both tracks; until then, keep branch-specific configs and results on their respective branches.
+**Do not compare 5 ms and 20 ms scores directly.** The 5 ms LFADS result is **train/val only** (no public-test), uses the S2 stability recipe (30 epochs, lr **1e-3**, gradient clip **1.0**, batch 8), and remains **below** the 5 ms STNDT-lite public-test headline (**0.3830 co-bps**). Cross-track context, doc links, run IDs, and integration notes: [`docs/portfolio_overview.md`](docs/portfolio_overview.md). A future unified `portfolio-nlb-project` branch may merge both tracks; until then, keep branch-specific configs and results on their respective branches.
 
 ## Start here in 10 minutes
 

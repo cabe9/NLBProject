@@ -10,9 +10,10 @@ integration plan.
 |-------|--------|----------|------|
 | **STNDT-lite** | [`codex/pc-validated-screen-c-sanitized`](https://github.com/cabe9/NLBProject/tree/codex/pc-validated-screen-c-sanitized) | **5 ms** | Primary reproducible neural baseline; validation-gated screens and public-test discipline |
 | **LFADS** | [`lfads-baseline-setup`](https://github.com/cabe9/NLBProject/tree/lfads-baseline-setup) | **20 ms** | Separate `lfads-torch` baseline; smoke → train/val → export → NLB evaluate |
+| **LFADS** | [`lfads-baseline-setup`](https://github.com/cabe9/NLBProject/tree/lfads-baseline-setup) | **5 ms** | Same bin width as STNDT-lite; S2 stability config (train/val, two seeds; no public-test) |
 
 **Do not compare co-bps across rows without explicit bin-size labels.**  
-5 ms STNDT-lite and 20 ms LFADS use different temporal binning and (for LFADS) the bundled lfads-torch HDF5 contract.
+5 ms STNDT-lite and 20 ms LFADS use different temporal binning and (for LFADS) the bundled lfads-torch HDF5 contract. 5 ms LFADS and 5 ms STNDT-lite share bin width but differ in model family, data contract, and split (LFADS: train/val only).
 
 ## Headline results (local, not live EvalAI)
 
@@ -20,6 +21,9 @@ integration plan.
 |-------|----------------|-------:|-------|
 | STNDT-lite mixed ensemble | 5 ms, local **public-test** vs frozen target | **0.3830** | Headline on STNDT branch; see [`docs/results.md`](results.md) (STNDT track; also in this tree) |
 | LFADS single-seed | 20 ms, **train/val** (`mc_maze_20_split`) | **0.3606** | 100 epochs, batch 32; not public-test — see [`docs/lfads_baseline_plan.md`](lfads_baseline_plan.md) |
+| LFADS S2 stability (seeds 0/1) | 5 ms, **train/val** (`mc_maze_split`) | **0.3160** / **0.3154** (mean **~0.3157**) | 30 epochs, batch 8, lr **1e-3**, grad clip **1.0**; stable runs; not public-test — see [`docs/lfads_baseline_plan.md`](lfads_baseline_plan.md) |
+
+5 ms LFADS S2 is **below** the 5 ms STNDT-lite public-test headline (**0.3830 co-bps**). Label bin size and split on every comparison.
 
 Frozen historical reference (5 ms leaderboard artifact): **0.3862 co-bps** — not a live target.
 
@@ -34,9 +38,9 @@ Frozen historical reference (5 ms leaderboard artifact): **0.3862 co-bps** — n
 
 **LFADS branch** (`lfads-baseline-setup`):
 
-- [`docs/lfads_baseline_plan.md`](lfads_baseline_plan.md) — env, data prep, export/eval, completed 2/50/100-epoch runs
+- [`docs/lfads_baseline_plan.md`](lfads_baseline_plan.md) — env, data prep, export/eval, 20 ms baselines, 5 ms S2 stability screen (seeds 0/1)
 - Scripts: `scripts/run_lfads_mc_maze_smoke.py`, `scripts/export_lfads_rates.py`, `scripts/evaluate_lfads_outputs.py`
-- Local runs (gitignored): `results/lfads_smoke/<run_id>/` (e.g. `20260603T201838Z` = 100-epoch best)
+- Local runs (gitignored): `results/lfads_smoke/<run_id>/` (e.g. `20260603T201838Z` = 20 ms 100-epoch best; `20260605T060424Z` / `20260605T171044Z` = 5 ms S2 seeds 0/1)
 
 ## Local-only artifacts
 

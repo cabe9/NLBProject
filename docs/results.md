@@ -35,6 +35,22 @@ The frozen `MC_Maze 5 ms` rank-1 leaderboard reference is `0.3862 co-bps`
 local benchmark improvement, but it should not be described as a live
 leaderboard rank.
 
+## LFADS baselines (separate track, `lfads-baseline-setup` branch)
+
+LFADS scores are **train/val only** via `nlb_tools.evaluate` — **not public-test**.
+Label bin size on every score.
+
+| Model | Bin size | Split | co-bps | Notes |
+|---|---|---|---:|---|
+| LFADS (`lfads-torch`), 100-epoch single seed | 20 ms | train/val | **0.3606** | Bundled lfads-torch HDF5 |
+| LFADS S2 stability, seed 0 | 5 ms | train/val | **0.3160** | 30 epochs, lr 1e-3, grad clip 1.0, batch 8 |
+| LFADS S2 stability, seed 1 | 5 ms | train/val | **0.3154** | Same config as seed 0 |
+| LFADS S2 stability, two-seed mean | 5 ms | train/val | **~0.3157** | Reproducible stable 30-epoch runs |
+
+5 ms LFADS S2 (**~0.3157 co-bps** train/val) is **below** the STNDT-lite 5 ms
+public-test headline (**0.3830 co-bps**). Do not compare without bin-size and
+split labels. Details: [`docs/lfads_baseline_plan.md`](lfads_baseline_plan.md).
+
 ## Reproduce
 
 ```bash
