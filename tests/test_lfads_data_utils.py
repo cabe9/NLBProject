@@ -78,10 +78,10 @@ def test_lfads_training_overrides_stability_knobs(tmp_path: Path) -> None:
 def test_analyze_lfads_metrics_csv_detects_divergence(tmp_path: Path) -> None:
     metrics = tmp_path / "metrics.csv"
     metrics.write_text(
-        "epoch,valid/recon_smth,valid/loss\n"
-        "0,0.5,1.0\n"
-        "1,0.4,0.9\n"
-        "2,nan,nan\n",
+        "cur_epoch,valid/recon_smth,valid/loss,valid/recon\n"
+        "0.0,0.5,1.0,0.5\n"
+        "1.0,0.4,0.9,0.4\n"
+        "2.0,nan,nan,nan\n",
         encoding="utf-8",
     )
     summary = analyze_lfads_metrics_csv(metrics)
@@ -90,3 +90,22 @@ def test_analyze_lfads_metrics_csv_detects_divergence(tmp_path: Path) -> None:
     assert summary["first_nan_epoch"] == 2
     assert summary["last_finite_epoch"] == 1
     assert summary["best_epoch"] == 1
+
+
+def test_analyze_lfads_metrics_csv_ignores_train_rows_and_r2_nan(tmp_path: Path) -> None:
+    """Train-only rows and missing-PSTH valid/r2 must not trigger divergence."""
+    metrics = tmp_path / "metrics.csv"
+    metrics.write_text(
+        "cur_epoch,epoch,valid/recon_smth,valid/loss,valid/recon,valid/r2,train/loss\n"
+        "0.0,0,0.5,1.0,0.5,nan,\n"
+        ",1,,,,,0.9\n"
+        "1.0,1,0.4,0.9,0.4,nan,\n"
+        ",2,,,,,0.8\n"
+        "2.0,2,0.3,0.8,0.3,nan,\n",
+        encoding="utf-8",
+    )
+    summary = analyze_lfads_metrics_csv(metrics, psth_available=False)
+    assert summary["diverged"] is False
+    assert summary["psth_metrics_status"] == "unavailable_no_psth_in_hdf5"
+    assert summary["best_epoch"] == 2
+    assert summary["validation_epochs_logged"] == 3

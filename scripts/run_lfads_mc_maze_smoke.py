@@ -131,6 +131,7 @@ def main(argv: list[str] | None = None) -> None:
         assert_finite_h5,
         best_checkpoint_in_dir,
         inspect_h5,
+        lfads_h5_has_psth,
         lfads_training_overrides,
         model_dims_from_h5,
     )
@@ -257,10 +258,15 @@ def main(argv: list[str] | None = None) -> None:
 
     ckpt_dir_saved = run_subdir / "lightning_checkpoints"
     best_ckpt = best_checkpoint_in_dir(ckpt_dir_saved)
-    metrics_summary = analyze_lfads_metrics_csv(metrics_dest)
+    psth_in_hdf5 = lfads_h5_has_psth(data_h5)
+    metrics_summary = analyze_lfads_metrics_csv(
+        metrics_dest,
+        psth_available=psth_in_hdf5,
+    )
     ckpt_saved = ckpt_dir_saved.is_dir()
+    outputs_non_finite = any(value is False for value in nan_report.values())
     status = "completed"
-    if metrics_summary.get("diverged"):
+    if metrics_summary.get("diverged") or outputs_non_finite:
         status = "diverged"
     elif not ckpt_saved and not output_files:
         status = "completed_with_warnings"
@@ -268,6 +274,7 @@ def main(argv: list[str] | None = None) -> None:
     manifest.update(
         {
             "status": status,
+            "psth_in_hdf5": psth_in_hdf5,
             "output_files": [str(p) for p in output_files],
             "output_shapes": output_shapes,
             "finite_outputs": nan_report,
@@ -282,10 +289,14 @@ def main(argv: list[str] | None = None) -> None:
             "No checkpoints or lfads_output HDF5; try smaller --batch-size or more smoke trials."
         )
     if status == "diverged":
-        manifest["warning"] = (
-            f"Training diverged at epoch {metrics_summary.get('first_nan_epoch')}; "
-            f"last finite epoch {metrics_summary.get('last_finite_epoch')}."
-        )
+        if outputs_non_finite:
+            manifest["warning"] = "Training produced non-finite model outputs."
+        else:
+            manifest["warning"] = (
+                f"Training diverged at epoch {metrics_summary.get('first_nan_epoch')}; "
+                f"last finite epoch {metrics_summary.get('last_finite_epoch')} "
+                f"(columns: {metrics_summary.get('nan_columns')})."
+            )
     manifest_path = out_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     logger.info("Smoke complete. Manifest: %s", manifest_path)

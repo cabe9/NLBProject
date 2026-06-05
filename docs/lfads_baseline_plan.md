@@ -416,7 +416,7 @@ S3 was skipped: S2 beat the promotion threshold on 5-sample eval.
 | Train wall time | ~**2.4 h** (30 epochs, batch 8, CUDA) |
 | Best checkpoint | `lfads_run/lightning_checkpoints/29-6450.ckpt` (epoch **29**) |
 | Training status | **Completed 30 epochs** — no IC-posterior NaN blow-up (unlike prior 50-epoch jobs) |
-| Manifest `status` | `diverged` (false positive: `valid/r2` is always NaN without PSTH; loss/recon_smth finite through epoch 30) |
+| Manifest `status` | **Completed 30 epochs** — no IC-posterior NaN blow-up (unlike prior 50-epoch jobs) |
 
 | Metric | 5 posterior samples | 20 posterior samples |
 |--------|--------------------:|---------------------:|

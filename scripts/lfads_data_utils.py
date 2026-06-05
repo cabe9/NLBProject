@@ -160,7 +160,29 @@ def best_checkpoint_in_dir(ckpt_dir: Path) -> Path | None:
     return non_last[-1] if non_last else None
 
 
-def analyze_lfads_metrics_csv(path: Path) -> dict[str, Any]:
+_DIVERGENCE_METRIC_KEYS = ("valid/recon_smth", "valid/loss", "valid/recon")
+_PSTH_METRIC_KEYS = ("valid/r2", "train/r2")
+
+
+def _is_validation_metrics_row(row: dict[str, str]) -> bool:
+    """True for csv_logs validation rows (train rows leave valid/* empty)."""
+    return any(row.get(key) not in (None, "") for key in _DIVERGENCE_METRIC_KEYS)
+
+
+def _raw_metric_non_finite(value: str | None) -> bool:
+    if value is None or value == "":
+        return False
+    try:
+        return not np.isfinite(float(value))
+    except ValueError:
+        return True
+
+
+def analyze_lfads_metrics_csv(
+    path: Path,
+    *,
+    psth_available: bool | None = None,
+) -> dict[str, Any]:
     """Summarize LFADS csv_logs metrics for divergence and best valid/recon_smth."""
     import csv
 
@@ -189,31 +211,42 @@ def analyze_lfads_metrics_csv(path: Path) -> dict[str, Any]:
     last_finite_epoch: int | None = None
     first_nan_epoch: int | None = None
     nan_columns: list[str] = []
+    validation_epochs_seen: list[int] = []
 
     for row in rows:
-        epoch_raw = row.get("epoch")
+        if not _is_validation_metrics_row(row):
+            continue
+        epoch_raw = row.get("cur_epoch")
+        if epoch_raw in (None, ""):
+            epoch_raw = row.get("epoch")
         if epoch_raw in (None, ""):
             continue
         epoch = int(float(epoch_raw))
+        validation_epochs_seen.append(epoch)
+
+        core_non_finite = [
+            key for key in _DIVERGENCE_METRIC_KEYS if _raw_metric_non_finite(row.get(key))
+        ]
+        if core_non_finite:
+            if first_nan_epoch is None:
+                first_nan_epoch = epoch
+            nan_columns.extend(core_non_finite)
+            continue
+
         smth = _float(row.get("valid/recon_smth"))
         loss = _float(row.get("valid/loss"))
-        finite_row = smth is not None or loss is not None
-        if finite_row:
+        if smth is not None or loss is not None:
             last_finite_epoch = epoch
             if smth is not None and (best_smth is None or smth < best_smth):
                 best_smth = smth
                 best_epoch = epoch
-        else:
-            if first_nan_epoch is None:
-                first_nan_epoch = epoch
-                for key in ("valid/recon_smth", "valid/loss", "valid/recon"):
-                    val = row.get(key)
-                    if val not in (None, ""):
-                        try:
-                            if not np.isfinite(float(val)):
-                                nan_columns.append(key)
-                        except ValueError:
-                            nan_columns.append(key)
+
+    if psth_available is False:
+        psth_metrics_status = "unavailable_no_psth_in_hdf5"
+    elif psth_available is True:
+        psth_metrics_status = "available"
+    else:
+        psth_metrics_status = "unknown"
 
     diverged = first_nan_epoch is not None
     return {
@@ -226,6 +259,8 @@ def analyze_lfads_metrics_csv(path: Path) -> dict[str, Any]:
         "diverged": diverged,
         "nan_columns": sorted(set(nan_columns)),
         "completed_epochs": last_finite_epoch,
+        "validation_epochs_logged": len(validation_epochs_seen),
+        "psth_metrics_status": psth_metrics_status,
     }
 
 
