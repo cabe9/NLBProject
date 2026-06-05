@@ -28,7 +28,9 @@ existing STNDT-lite stack. This is **not** another STNDT-lite screen.
 
 1. Optional **batch-size 64** probe if GPU memory allows (one OOM retry to 32; not a sweep).
 2. Optional **second seed** at 50–100 epochs if reproducibility matters.
-3. **5 ms** NWB path only if fair comparison to STNDT-lite is explicitly required.
+3. **5 ms** pipeline validated through probe + salvage; long-train unstable — see
+   [5 ms LFADS pipeline](#5-ms-lfads-pipeline-2026-06-04). Further 5 ms work needs explicit
+   stability knobs, not another unattended 50-epoch job.
 4. **No 200-epoch** scaling without a new structural reason (diminishing returns vs 50→100).
 5. **No public-test** until explicit approval; never compare 20 ms scores to the 5 ms headline without bin-size labels.
 
@@ -118,15 +120,27 @@ Config mapping (upstream `configs/model/nlb_mc_maze.yaml`):
 
 ### B. 5 ms from local NWB (STNDT-lite-aligned bin width)
 
-Requires `NLB_DATA_DIR` or `--data-path` (same layout as main pipeline):
+Requires `NLB_DATA_DIR` or `--data-path` (same layout as main pipeline). Use
+`--skip-psth` — full PSTH at 5 ms OOMs (~10 GB); evaluation omits **psth R2** when PSTH
+is absent.
 
 ```powershell
 $env:NLB_DATA_DIR = "C:\Users\david\NLBProject\data\raw"
-python scripts/prepare_lfads_mc_maze.py --bin-size-ms 5 --source nwb
+python scripts/prepare_lfads_mc_maze.py --bin-size-ms 5 --source nwb --skip-psth --write-smoke-subset
 ```
 
-Update `configs/lfads/mc_maze_5ms_from_nwb.yaml` and lfads model YAML dimensions from the
-written `*_manifest.json` before any real training.
+Outputs: `data/lfads/mc_maze_5ms_val.h5`, `mc_maze_5ms_val_smoke.h5`, manifest. Shapes
+(2026-06-04 build):
+
+| Key | Shape |
+|-----|-------|
+| `train_encod_data` | (1721, 140, 137) |
+| `train_recon_data` | (1721, 180, 182) |
+| `valid_encod_data` | (574, 140, 137) |
+| `valid_recon_data` | (574, 180, 182) |
+
+Model dims: `encod_data_dim` 137, `encod_seq_len` 140, `recon_seq_len` 180,
+`readout_out_features` 182 (`configs/lfads/mc_maze_5ms_from_nwb.yaml`).
 
 ## Smoke test (training)
 
@@ -205,7 +219,7 @@ Dataset keys for **20 ms**: `mc_maze_20` → metrics under `mc_maze_20_split`.
 - [x] Export with posterior samples (20 on baseline run)
 - [x] Re-evaluate; finite `co-bps` on val — see baseline table below
 - [ ] Optional: rebuild targets from NWB via `make_eval_target_tensors` for exact NLB parity
-- [ ] 5 ms path only if fair STNDT-lite comparison is required
+- [x] 5 ms path: probe + salvage documented — see [5 ms LFADS pipeline](#5-ms-lfads-pipeline-2026-06-04)
 
 ## Completed 20 ms validation baselines (2026-06-03)
 
@@ -304,16 +318,93 @@ Artifacts:
 | **200+ epochs** | No — diminishing returns after 100 vs 50 |
 | **batch 64 probe** | Next meaningful knob if GPU memory allows; one OOM retry to 32 |
 | **Second seed** | Optional reproducibility check at 50–100 epochs |
-| **5 ms LFADS** | Only if fair comparison to STNDT-lite is required |
+| **5 ms LFADS** | Pipeline valid; long-train unstable — stability knobs only (see 5 ms section) |
 | **8-hour / PBT run** | No |
 | **Hyperparameter sweep** | Not yet |
 | **Public-test** | No |
 
-## Recommended path: 20 ms first, then decide on 5 ms
+## 5 ms LFADS pipeline (2026-06-04)
 
-**20 ms first** — fastest working LFADS baseline (model-family demo, not comparable to 5 ms headline).
+All metrics below are **5 ms MC_Maze train/val** via `nlb_tools.evaluate` on
+`data/lfads/mc_maze_5ms_val.h5` (`mc_maze_split`). **Not public-test.**
+**Not comparable** to the STNDT-lite **5 ms** local public-test headline (**0.3830 co-bps**)
+without explicit bin-size and model-family labels. **20 ms LFADS** (**0.3606 co-bps** @ 100
+epochs) remains the validated LFADS baseline for now.
 
-**5 ms from NWB** — better for fair comparison to STNDT-lite `0.3830`, more preprocessing/debug risk.
+### Pipeline status
+
+- **5 ms HDF5 creation succeeded** (`prepare_lfads_mc_maze.py --bin-size-ms 5 --skip-psth`).
+- **PSTH creation OOMed** at 5 ms (~10 GB); builds use **`--skip-psth`**.
+- Shapes (full val HDF5):
+
+| Key | Shape |
+|-----|-------|
+| `train_encod_data` | (1721, 140, 137) |
+| `train_recon_data` | (1721, 180, 182) |
+| `valid_encod_data` | (574, 140, 137) |
+| `valid_recon_data` | (574, 180, 182) |
+
+### Successful checks (train/val only)
+
+| Step | Run dir | Result |
+|------|---------|--------|
+| Skip-train / shape check | `20260604T055845Z` | OK |
+| 1-epoch smoke train + export/eval | `20260604T055849Z` | OK (plumbing) |
+| 2-epoch full-HDF5 probe | `20260604T055919Z` | OK; alignment OK |
+
+**2-epoch probe (5 ms train/val):** **co-bps 0.1343** (under-trained plumbing check, not a
+baseline score).
+
+### Failed long-train attempts
+
+| Run dir | Config | Failure |
+|---------|--------|---------|
+| `20260604T062750Z` | 50 epochs, **batch 8** | ~epoch **18**, IC-posterior numerical blow-up → NaN |
+| `20260604T074855Z` | 50 epochs, **batch 4** retry | ~epoch **11**, same failure mode |
+
+Batch-size reduction **did not** fix instability. Checkpoints were not copied into run dirs
+on crash; surviving files live under `external/lfads-torch/lightning_checkpoints/`.
+
+### Salvage checkpoint (pre-divergence, batch-8 run)
+
+Export via `scripts/export_lfads_rates.py --checkpoint …` (no new training):
+
+| Field | Value |
+|-------|-------|
+| Checkpoint | `external/lfads-torch/lightning_checkpoints/14-3225.ckpt` |
+| Epoch / step | **14** / **3225** |
+| Run dir (manifest / eval) | `results/lfads_smoke/20260604T062750Z/` |
+| Rates HDF5 | `lfads_outputs/lfads_output_mc_maze_5ms_val.h5` |
+| Outputs | **Finite** (`train/valid_output_params`) |
+| Export | 5 posterior samples (~20 min on full HDF5) |
+
+| Metric | Value |
+|--------|------:|
+| co-bps (val) | **0.2902** |
+| fp-bps | 0.1929 |
+| vel R2 | 0.8871 |
+| psth R2 | *not computed* (`--skip-psth` on 5 ms HDF5) |
+
+**vs 2-epoch probe:** salvage **0.2902** vs **0.1343** co-bps — materially better, but still
+**not** a stable full 50-epoch baseline (training diverged before epoch 18; no epoch 15–17
+checkpoints on disk).
+
+### Interpretation
+
+- **5 ms LFADS data / export / NLB eval pipeline is valid** end-to-end.
+- **Current long-train LFADS recipe is unstable at 5 ms** — do **not** run another unattended
+  50-epoch job with this config.
+- Further 5 ms LFADS work should use **explicit stability changes**: lower `lr_init`,
+  gradient clipping, early stopping / capped epochs, or smaller model — not blind epoch scaling.
+- **20 ms LFADS** (**0.3606 co-bps**, 100 epochs) remains the **validated LFADS baseline** until
+  5 ms long-train stability is fixed.
+
+## Recommended path
+
+**20 ms** — validated LFADS baseline (**0.3606 co-bps** train/val, 20 ms).
+
+**5 ms** — pipeline proven; fair STNDT-lite bin width, but long-train unstable. Use only with
+labeled **5 ms train/val LFADS** scores and stability-first follow-ups.
 
 ## Policy
 
